@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+:root {
+  --background: #070b14;
+  --foreground: #edf2ff;
+  --muted: #a8b3cf;
+  --surface: rgba(19, 29, 53, 0.55);
+  --surface-strong: rgba(12, 20, 38, 0.75);
+  --stroke: rgba(190, 210, 255, 0.22);
+  --brand-a: #58a6ff;
+  --brand-b: #8e7dff;
+  --brand-c: #4de0c4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at 10% 10%, #18294f 0%, var(--background) 50%), var(--background);
+  color: var(--foreground);
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100vh;
+}
+
+.container-shell {
+  width: min(1100px, 92vw);
+  margin-inline: auto;
+}
+
+.glass-surface {
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--stroke);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+}
+
+.glass-card {
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--stroke);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  border-radius: 1rem;
+  padding: 1.25rem;
+}
+
+.glass-panel {
+  background: var(--surface-strong);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--stroke);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  border-radius: 1.5rem;
+  padding: 2rem;
+}
+
+.btn-gradient-primary {
+  background: linear-gradient(120deg, var(--brand-a), var(--brand-b));
+  color: #fff;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.75rem 1.2rem;
+  font-weight: 600;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.btn-gradient-secondary {
+  background: linear-gradient(120deg, rgba(77, 224, 196, 0.2), rgba(88, 166, 255, 0.2));
+  color: var(--foreground);
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  padding: 0.72rem 1.1rem;
+  font-weight: 600;
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+
+.btn-gradient-primary:hover,
+.btn-gradient-secondary:hover {
+  transform: translateY(-1px);
+}
+
+.section-title {
+  @apply text-3xl md:text-4xl font-semibold tracking-tight;
+}
+
+.section-copy {
+  @apply text-base md:text-lg text-[var(--muted)] leading-relaxed;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
