@@ -20,7 +20,35 @@ interface EbaySearchResponse {
   total?: number;
 }
 
-let cachedToken: { value: string; expiresAt: number } | null = null;
+let cachedToken: { value: string; expiresAt: number; env: string } | null = null;
+
+function getEbayEnv() {
+  const explicit = process.env.EBAY_ENV?.toLowerCase();
+  if (explicit === "sandbox" || explicit === "production") {
+    return explicit;
+  }
+
+  const clientId = process.env.EBAY_CLIENT_ID ?? "";
+  const clientSecret = process.env.EBAY_CLIENT_SECRET ?? "";
+  if (clientId.includes("-SBX-") || clientSecret.startsWith("SBX-")) {
+    return "sandbox";
+  }
+
+  return "production";
+}
+
+function getEbayApiBase() {
+  return getEbayEnv() === "sandbox" ? "https://api.sandbox.ebay.com" : "https://api.ebay.com";
+}
+
+export function getEbayConfigStatus() {
+  const clientId = process.env.EBAY_CLIENT_ID;
+  const clientSecret = process.env.EBAY_CLIENT_SECRET;
+  return {
+    configured: Boolean(clientId && clientSecret),
+    env: getEbayEnv()
+  };
+}
 
 async function getApplicationToken() {
   const clientId = process.env.EBAY_CLIENT_ID;
@@ -29,13 +57,14 @@ async function getApplicationToken() {
     throw new Error("EBAY_CLIENT_ID and EBAY_CLIENT_SECRET are required for search.");
   }
 
-  if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) {
+  const env = getEbayEnv();
+  if (cachedToken && cachedToken.env === env && cachedToken.expiresAt > Date.now() + 60_000) {
     return cachedToken.value;
   }
 
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
   const scope = encodeURIComponent("https://api.ebay.com/oauth/api_scope");
-  const response = await fetch(`https://api.ebay.com/identity/v1/oauth2/token`, {
+  const response = await fetch(`${getEbayApiBase()}/identity/v1/oauth2/token`, {
     method: "POST",
     headers: {
       Authorization: `Basic ${credentials}`,
@@ -46,13 +75,14 @@ async function getApplicationToken() {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`eBay OAuth failed: ${response.status} ${text}`);
+    throw new Error(`eBay OAuth failed (${env}): ${response.status} ${text}`);
   }
 
   const payload = (await response.json()) as EbayTokenResponse;
   cachedToken = {
     value: payload.access_token,
-    expiresAt: Date.now() + payload.expires_in * 1000
+    expiresAt: Date.now() + payload.expires_in * 1000,
+    env
   };
   return payload.access_token;
 }
@@ -79,16 +109,17 @@ export interface NormalizedEbayResult {
 export async function searchEbayListings(params: EbaySearchParams): Promise<NormalizedEbayResult[]> {
   const token = await getApplicationToken();
   const marketplaceId = params.marketplaceId ?? process.env.EBAY_MARKETPLACE_ID ?? "EBAY_US";
-  const limit = params.limit ?? 50;
+  const limit = Math.min(Math.max(params.limit ?? 50, 1), 200);
 
   const filters: string[] = [];
   if (params.minPrice !== undefined || params.maxPrice !== undefined) {
     const min = params.minPrice ?? 0;
     const max = params.maxPrice ?? 999999;
     filters.push(`price:[${min}..${max}]`);
+    filters.push("priceCurrency:USD");
   }
 
-  const url = new URL("https://api.ebay.com/buy/browse/v1/item_summary/search");
+  const url = new URL(`${getEbayApiBase()}/buy/browse/v1/item_summary/search`);
   url.searchParams.set("q", params.keywords);
   url.searchParams.set("sort", "newlyListed");
   url.searchParams.set("limit", String(limit));
@@ -106,7 +137,7 @@ export async function searchEbayListings(params: EbaySearchParams): Promise<Norm
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`eBay search failed: ${response.status} ${text}`);
+    throw new Error(`eBay search failed (${getEbayEnv()}): ${response.status} ${text}`);
   }
 
   const payload = (await response.json()) as EbaySearchResponse;

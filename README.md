@@ -54,20 +54,23 @@ Upload images in **Admin → Listings** when creating/editing a watch.
 
 ## eBay search
 
-Manual run:
+Search is **manual only** (no Vercel cron).
+
+Admin UI (`/admin/search`):
+- add keyword watches
+- click **Run** on a single query, or **Run all enabled searches**
+- review results, filter “Show only new”, mark seen
+
+Optional CLI:
 
 ```bash
 npm run search:ebay
 ```
 
-Admin UI:
-- configure keyword watches in `/admin/search`
-- click **Run all enabled searches**
-- review results in the Search tab
-
-Scheduled runs (Vercel cron, 3x/day) call:
-
-- `GET /api/cron/ebay-search` with header `Authorization: Bearer <CRON_SECRET>`
+Environment:
+- `EBAY_CLIENT_ID` / `EBAY_CLIENT_SECRET` — App ID + Cert ID from eBay developer keyset
+- `EBAY_ENV=sandbox` or `production` (Sandbox keys contain `SBX` and only work against sandbox)
+- `EBAY_MARKETPLACE_ID=EBAY_US` (optional)
 
 ## Storefront Checkout Environment
 

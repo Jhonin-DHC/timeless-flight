@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getEbayConfigStatus } from "@/lib/ebay";
 import { connectMongo } from "@/lib/mongodb";
 import { isR2Configured } from "@/lib/r2";
 import { getSetting, setSetting } from "@/models/AppSettings";
@@ -8,11 +9,13 @@ export async function GET() {
     await connectMongo();
     const marketplaceId = await getSetting("marketplaceId", process.env.EBAY_MARKETPLACE_ID ?? "EBAY_US");
     const searchRunsPerDay = await getSetting("searchRunsPerDay", 3);
+    const ebay = getEbayConfigStatus();
     return NextResponse.json({
       settings: {
         marketplaceId,
         searchRunsPerDay,
-        ebayConfigured: Boolean(process.env.EBAY_CLIENT_ID && process.env.EBAY_CLIENT_SECRET),
+        ebayConfigured: ebay.configured,
+        ebayEnv: ebay.env,
         mongoConfigured: Boolean(process.env.MONGODB_URI),
         r2Configured: isR2Configured()
       }

@@ -25,10 +25,43 @@ const listings = [
 const searchQueries = [
   {
     name: "Rolex Steel Sports",
-    keywords: 'Rolex Submariner 126610LN GMT-Master II Pepsi Batgirl steel',
+    keywords: "Rolex Submariner 126610LN GMT-Master II Pepsi Batgirl",
     marketplaceId: "EBAY_US",
-    minPrice: 5000,
-    maxPrice: 30000,
+    resultLimit: 50,
+    enabled: true
+  },
+  {
+    name: "Tudor Black Bay Series",
+    keywords: "Tudor Black Bay BB58 BB54 BB58 GMT",
+    marketplaceId: "EBAY_US",
+    resultLimit: 50,
+    enabled: true
+  },
+  {
+    name: "Omega Speedmaster Professional",
+    keywords: "Omega Speedmaster Professional Hesalite Sapphire Moonwatch",
+    marketplaceId: "EBAY_US",
+    resultLimit: 50,
+    enabled: true
+  },
+  {
+    name: "Omega Seamaster Professional 300M",
+    keywords: "Omega Seamaster Professional 300M Hesalite Sapphire",
+    marketplaceId: "EBAY_US",
+    resultLimit: 50,
+    enabled: true
+  },
+  {
+    name: 'Seiko 6139 "Pogue"',
+    keywords: "Seiko 6139 Pogue",
+    marketplaceId: "EBAY_US",
+    resultLimit: 50,
+    enabled: true
+  },
+  {
+    name: 'Seiko 6105 "Captain Willard"',
+    keywords: "Seiko 6105 Captain Willard",
+    marketplaceId: "EBAY_US",
     resultLimit: 50,
     enabled: true
   }

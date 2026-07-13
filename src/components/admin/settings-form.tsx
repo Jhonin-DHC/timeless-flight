@@ -6,6 +6,7 @@ interface SettingsPayload {
   marketplaceId: string;
   searchRunsPerDay: number;
   ebayConfigured: boolean;
+  ebayEnv?: "sandbox" | "production";
   mongoConfigured: boolean;
   r2Configured: boolean;
 }
@@ -69,10 +70,13 @@ export function SettingsForm() {
       <div className="glass-card space-y-2 text-sm">
         <p>MongoDB configured: {settings.mongoConfigured ? "Yes" : "No"}</p>
         <p>R2 image uploads configured: {settings.r2Configured ? "Yes" : "No"}</p>
-        <p>eBay API configured: {settings.ebayConfigured ? "Yes" : "No"}</p>
+        <p>
+          eBay API configured: {settings.ebayConfigured ? "Yes" : "No"}
+          {settings.ebayConfigured && settings.ebayEnv ? ` (${settings.ebayEnv})` : ""}
+        </p>
         <p className="text-[var(--muted)]">
-          For R2 uploads, set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, and
-          R2_PUBLIC_BASE_URL in `.env.local`.
+          Search runs are manual from Admin → Search. Use Production App ID + Cert ID for live eBay
+          listings, or set EBAY_ENV=sandbox with Sandbox keys.
         </p>
       </div>
     </div>

@@ -6,6 +6,19 @@ if (!uri) {
   process.exit(1);
 }
 
+async function getEbayApiBase() {
+  const explicit = process.env.EBAY_ENV?.toLowerCase();
+  if (explicit === "sandbox" || explicit === "production") {
+    return explicit === "sandbox" ? "https://api.sandbox.ebay.com" : "https://api.ebay.com";
+  }
+  const clientId = process.env.EBAY_CLIENT_ID ?? "";
+  const clientSecret = process.env.EBAY_CLIENT_SECRET ?? "";
+  if (clientId.includes("-SBX-") || clientSecret.startsWith("SBX-")) {
+    return "https://api.sandbox.ebay.com";
+  }
+  return "https://api.ebay.com";
+}
+
 async function getEbayToken() {
   const clientId = process.env.EBAY_CLIENT_ID;
   const clientSecret = process.env.EBAY_CLIENT_SECRET;
@@ -15,7 +28,7 @@ async function getEbayToken() {
 
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
   const scope = encodeURIComponent("https://api.ebay.com/oauth/api_scope");
-  const response = await fetch("https://api.ebay.com/identity/v1/oauth2/token", {
+  const response = await fetch(`${await getEbayApiBase()}/identity/v1/oauth2/token`, {
     method: "POST",
     headers: {
       Authorization: `Basic ${credentials}`,
@@ -33,7 +46,7 @@ async function getEbayToken() {
 }
 
 async function searchEbay(token, query) {
-  const url = new URL("https://api.ebay.com/buy/browse/v1/item_summary/search");
+  const url = new URL(`${await getEbayApiBase()}/buy/browse/v1/item_summary/search`);
   url.searchParams.set("q", query.keywords);
   url.searchParams.set("sort", "newlyListed");
   url.searchParams.set("limit", String(query.resultLimit ?? 50));
@@ -41,6 +54,7 @@ async function searchEbay(token, query) {
   const filters = [];
   if (query.minPrice !== undefined || query.maxPrice !== undefined) {
     filters.push(`price:[${query.minPrice ?? 0}..${query.maxPrice ?? 999999}]`);
+    filters.push("priceCurrency:USD");
   }
   if (filters.length) url.searchParams.set("filter", filters.join(","));
 

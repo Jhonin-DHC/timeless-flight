@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CUSTOM_PRESET_ID, SEARCH_PRESETS } from "@/data/search-presets";
 
 interface SearchQueryRow {
   _id: string;
@@ -28,6 +29,14 @@ interface SearchResultRow {
   lastSeenAt: string;
 }
 
+interface RunSummary {
+  queryId: string;
+  queryName: string;
+  found: number;
+  newCount: number;
+  updatedCount: number;
+}
+
 const emptyQuery = {
   name: "",
   keywords: "",
@@ -38,14 +47,47 @@ const emptyQuery = {
   enabled: true
 };
 
+function matchPresetId(name: string, keywords: string) {
+  const match = SEARCH_PRESETS.find((preset) => preset.name === name || preset.keywords === keywords);
+  return match?.id ?? CUSTOM_PRESET_ID;
+}
+
 export function SearchManager() {
   const [queries, setQueries] = useState<SearchQueryRow[]>([]);
   const [results, setResults] = useState<SearchResultRow[]>([]);
   const [form, setForm] = useState(emptyQuery);
+  const [presetId, setPresetId] = useState(CUSTOM_PRESET_ID);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+  const [runningQueryId, setRunningQueryId] = useState<string | null>(null);
   const [onlyNew, setOnlyNew] = useState(false);
+  const [ebayConfigured, setEbayConfigured] = useState<boolean | null>(null);
+  const [ebayEnv, setEbayEnv] = useState<string | null>(null);
+
+  const isCustom = presetId === CUSTOM_PRESET_ID;
+
+  const applyPreset = (nextPresetId: string) => {
+    setPresetId(nextPresetId);
+    if (nextPresetId === CUSTOM_PRESET_ID) {
+      setForm((current) => ({ ...current, name: "", keywords: "" }));
+      return;
+    }
+    const preset = SEARCH_PRESETS.find((item) => item.id === nextPresetId);
+    if (!preset) return;
+    setForm((current) => ({
+      ...current,
+      name: preset.name,
+      keywords: preset.keywords
+    }));
+  };
+
+  const resetForm = () => {
+    setEditingId(null);
+    setForm(emptyQuery);
+    setPresetId(CUSTOM_PRESET_ID);
+  };
 
   const loadQueries = async () => {
     const response = await fetch("/api/admin/search-queries");
@@ -61,18 +103,27 @@ export function SearchManager() {
 
   useEffect(() => {
     void loadQueries();
+    void fetch("/api/admin/settings")
+      .then((response) => response.json())
+      .then((payload) => {
+        setEbayConfigured(Boolean(payload.settings?.ebayConfigured));
+        setEbayEnv(payload.settings?.ebayEnv ?? null);
+      })
+      .catch(() => setEbayConfigured(false));
   }, []);
 
   useEffect(() => {
-    void (async () => {
-      const response = await fetch(`/api/admin/search/results?onlyNew=${onlyNew}`);
-      const payload = await response.json();
-      if (response.ok) setResults(payload.results ?? []);
-    })();
+    void loadResults();
   }, [onlyNew]);
 
   const saveQuery = async () => {
     setError(null);
+    setStatus(null);
+    if (!form.name.trim() || !form.keywords.trim()) {
+      setError("Name and keywords are required.");
+      return;
+    }
+
     const response = await fetch(editingId ? `/api/admin/search-queries/${editingId}` : "/api/admin/search-queries", {
       method: editingId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
@@ -83,14 +134,39 @@ export function SearchManager() {
       setError(payload.error ?? "Failed to save query.");
       return;
     }
-    setForm(emptyQuery);
-    setEditingId(null);
+    resetForm();
+    setStatus(editingId ? "Query updated." : "Query added.");
     await loadQueries();
+  };
+
+  const deleteQuery = async (queryId: string) => {
+    setError(null);
+    const response = await fetch(`/api/admin/search-queries/${queryId}`, { method: "DELETE" });
+    const payload = await response.json();
+    if (!response.ok) {
+      setError(payload.error ?? "Failed to delete query.");
+      return;
+    }
+    if (editingId === queryId) {
+      resetForm();
+    }
+    setStatus("Query deleted.");
+    await loadQueries();
+  };
+
+  const formatSummary = (summary: RunSummary[]) => {
+    if (summary.length === 0) return "No enabled queries to run.";
+    return summary
+      .map((item) => `${item.queryName}: ${item.found} found (${item.newCount} new, ${item.updatedCount} updated)`)
+      .join(" • ");
   };
 
   const runSearch = async (queryId?: string) => {
     setRunning(true);
+    setRunningQueryId(queryId ?? "__all__");
     setError(null);
+    setStatus(null);
+
     const response = await fetch("/api/admin/search/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -98,10 +174,14 @@ export function SearchManager() {
     });
     const payload = await response.json();
     setRunning(false);
+    setRunningQueryId(null);
+
     if (!response.ok) {
       setError(payload.error ?? "Search failed.");
       return;
     }
+
+    setStatus(formatSummary((payload.summary ?? []) as RunSummary[]));
     await loadQueries();
     await loadResults();
   };
@@ -115,31 +195,77 @@ export function SearchManager() {
     await loadResults();
   };
 
+  const markAllSeen = async () => {
+    const unseenIds = results.filter((result) => result.isUnseen).map((result) => result._id);
+    if (unseenIds.length === 0) return;
+    await markSeen(unseenIds);
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="section-title">eBay Search</h2>
-          <p className="section-copy">Configure keyword watches and review matched listings.</p>
+          <p className="section-copy">
+            Configure keyword watches and run searches manually. No automatic cron — click Run when you want fresh results.
+          </p>
+          {ebayConfigured !== null ? (
+            <p className="mt-2 text-xs text-[var(--muted)]">
+              eBay API: {ebayConfigured ? `configured (${ebayEnv ?? "production"})` : "not configured — set EBAY_CLIENT_ID and EBAY_CLIENT_SECRET"}
+            </p>
+          ) : null}
         </div>
-        <button type="button" disabled={running} onClick={() => runSearch()} className="btn-gradient-primary text-sm">
-          {running ? "Running..." : "Run all enabled searches"}
+        <button
+          type="button"
+          disabled={running || ebayConfigured === false}
+          onClick={() => runSearch()}
+          className="btn-gradient-primary text-sm disabled:opacity-50"
+        >
+          {runningQueryId === "__all__" ? "Running..." : "Run all enabled searches"}
         </button>
       </div>
 
       <div className="glass-card grid gap-3 md:grid-cols-2">
+        <label className="md:col-span-2 space-y-1.5">
+          <span className="text-xs uppercase tracking-wide text-[var(--muted)]">Saved keyword set</span>
+          <select
+            value={presetId}
+            onChange={(event) => applyPreset(event.target.value)}
+            className="w-full rounded-xl border border-white/15 bg-[var(--surface)] px-3 py-2 text-sm"
+          >
+            <option value={CUSTOM_PRESET_ID}>Custom — type your own</option>
+            {SEARCH_PRESETS.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
         <input
           value={form.name}
-          onChange={(event) => setForm({ ...form, name: event.target.value })}
+          onChange={(event) => {
+            setPresetId(CUSTOM_PRESET_ID);
+            setForm({ ...form, name: event.target.value });
+          }}
           placeholder="Query name (e.g. Rolex Steel Sports)"
           className="rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm"
+          readOnly={!isCustom && !editingId}
         />
         <input
           value={form.keywords}
-          onChange={(event) => setForm({ ...form, keywords: event.target.value })}
-          placeholder='Keywords (e.g. Submariner 126610LN GMT Pepsi Batgirl)'
+          onChange={(event) => {
+            setPresetId(CUSTOM_PRESET_ID);
+            setForm({ ...form, keywords: event.target.value });
+          }}
+          placeholder={isCustom ? "Type custom keywords…" : "Keywords from selected preset"}
           className="rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm md:col-span-2"
         />
+        {!isCustom ? (
+          <p className="md:col-span-2 text-xs text-[var(--muted)]">
+            Preset selected. You can still tweak keywords before saving, or choose “Custom — type your own”.
+          </p>
+        ) : null}
         <input
           value={form.marketplaceId}
           onChange={(event) => setForm({ ...form, marketplaceId: event.target.value })}
@@ -173,11 +299,18 @@ export function SearchManager() {
             checked={form.enabled}
             onChange={(event) => setForm({ ...form, enabled: event.target.checked })}
           />
-          Enabled
+          Enabled (included in “Run all”)
         </label>
-        <button type="button" onClick={saveQuery} className="btn-gradient-secondary text-sm">
-          {editingId ? "Update query" : "Add query"}
-        </button>
+        <div className="flex gap-2">
+          <button type="button" onClick={saveQuery} className="btn-gradient-secondary text-sm">
+            {editingId ? "Update query" : "Add query"}
+          </button>
+          {editingId ? (
+            <button type="button" className="text-sm text-[var(--muted)]" onClick={resetForm}>
+              Cancel
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -188,18 +321,27 @@ export function SearchManager() {
               <p className="text-sm text-[var(--muted)]">{query.keywords}</p>
               <p className="text-xs text-[var(--muted)]">
                 {query.enabled ? "Enabled" : "Disabled"}
-                {query.lastRunAt ? ` • Last run ${new Date(query.lastRunAt).toLocaleString()}` : ""}
+                {typeof query.minPrice === "number" || typeof query.maxPrice === "number"
+                  ? ` • $${query.minPrice ?? 0}–$${query.maxPrice ?? "∞"}`
+                  : ""}
+                {query.lastRunAt ? ` • Last run ${new Date(query.lastRunAt).toLocaleString()}` : " • Never run"}
               </p>
             </div>
-            <div className="flex gap-2">
-              <button type="button" className="btn-gradient-primary text-sm" onClick={() => runSearch(query._id)}>
-                Run
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={running || ebayConfigured === false}
+                className="btn-gradient-primary text-sm disabled:opacity-50"
+                onClick={() => runSearch(query._id)}
+              >
+                {runningQueryId === query._id ? "Running..." : "Run"}
               </button>
               <button
                 type="button"
                 className="btn-gradient-secondary text-sm"
                 onClick={() => {
                   setEditingId(query._id);
+                  setPresetId(matchPresetId(query.name, query.keywords));
                   setForm({
                     name: query.name,
                     keywords: query.keywords,
@@ -213,20 +355,32 @@ export function SearchManager() {
               >
                 Edit
               </button>
+              <button type="button" className="text-sm text-red-300" onClick={() => deleteQuery(query._id)}>
+                Delete
+              </button>
             </div>
           </div>
         ))}
+        {queries.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">No search queries yet. Add one above, then click Run.</p>
+        ) : null}
       </div>
 
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
+      {status ? <p className="text-sm text-[var(--brand-a)]">{status}</p> : null}
 
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-xl font-semibold">Search results</h3>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={onlyNew} onChange={(event) => setOnlyNew(event.target.checked)} />
-            Show only new
-          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={onlyNew} onChange={(event) => setOnlyNew(event.target.checked)} />
+              Show only new
+            </label>
+            <button type="button" className="text-sm text-[var(--muted)]" onClick={markAllSeen}>
+              Mark all seen
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-3">
