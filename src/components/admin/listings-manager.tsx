@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 
 interface ListingRow {
   _id: string;
-  storefrontProductId: string;
   slug: string;
   name: string;
   brand: string;
@@ -12,12 +11,12 @@ interface ListingRow {
   year: number;
   priceUsd: number;
   imageUrl: string;
+  imageUrls: string[];
   description: string;
   published: boolean;
 }
 
 const emptyForm: Omit<ListingRow, "_id"> = {
-  storefrontProductId: "",
   slug: "",
   name: "",
   brand: "",
@@ -25,6 +24,7 @@ const emptyForm: Omit<ListingRow, "_id"> = {
   year: new Date().getFullYear(),
   priceUsd: 0,
   imageUrl: "",
+  imageUrls: [],
   description: "",
   published: true
 };
@@ -52,41 +52,95 @@ export function ListingsManager() {
       setError(payload.error ?? "Failed to load listings.");
       return;
     }
-    setListings(payload.listings ?? []);
+    setListings(
+      (payload.listings ?? []).map((listing: ListingRow & { imageUrls?: string[] }) => ({
+        ...listing,
+        imageUrls: Array.isArray(listing.imageUrls) ? listing.imageUrls : []
+      }))
+    );
   };
 
   useEffect(() => {
     void load();
   }, []);
 
-  const uploadImage = async (file: File) => {
+  const uploadFiles = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
+
     setUploading(true);
     setError(null);
 
-    const body = new FormData();
-    body.append("file", file);
-
-    const response = await fetch("/api/admin/uploads", {
-      method: "POST",
-      body
-    });
-    const payload = await response.json();
-    setUploading(false);
-
-    if (!response.ok) {
-      setError(payload.error ?? "Image upload failed.");
-      return;
+    const uploadedUrls: string[] = [];
+    for (const file of fileArray) {
+      const body = new FormData();
+      body.append("file", file);
+      const response = await fetch("/api/admin/uploads", {
+        method: "POST",
+        body
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setUploading(false);
+        setError(payload.error ?? `Failed to upload ${file.name}.`);
+        return;
+      }
+      uploadedUrls.push(payload.url as string);
     }
 
-    setForm((current) => ({ ...current, imageUrl: payload.url }));
+    setForm((current) => {
+      const nextUrls = [...uploadedUrls];
+      if (!current.imageUrl && nextUrls.length > 0) {
+        const [main, ...rest] = nextUrls;
+        return {
+          ...current,
+          imageUrl: main,
+          imageUrls: [...current.imageUrls, ...rest]
+        };
+      }
+      return {
+        ...current,
+        imageUrls: [...current.imageUrls, ...nextUrls]
+      };
+    });
+    setUploading(false);
+  };
+
+  const makeMain = (url: string) => {
+    setForm((current) => {
+      if (current.imageUrl === url) return current;
+      const others = [current.imageUrl, ...current.imageUrls].filter(Boolean).filter((item) => item !== url);
+      return {
+        ...current,
+        imageUrl: url,
+        imageUrls: others
+      };
+    });
+  };
+
+  const removeImage = (url: string) => {
+    setForm((current) => {
+      if (current.imageUrl === url) {
+        const [nextMain, ...rest] = current.imageUrls;
+        return {
+          ...current,
+          imageUrl: nextMain ?? "",
+          imageUrls: rest
+        };
+      }
+      return {
+        ...current,
+        imageUrls: current.imageUrls.filter((item) => item !== url)
+      };
+    });
   };
 
   const save = async () => {
     setSaving(true);
     setError(null);
 
-    if (!form.name || !form.slug || !form.brand || !form.storefrontProductId || !form.imageUrl) {
-      setError("Name, slug, brand, storefront product ID, and image are required.");
+    if (!form.name || !form.slug || !form.brand || !form.imageUrl) {
+      setError("Name, slug, brand, and at least one image (main/thumbnail) are required.");
       setSaving(false);
       return;
     }
@@ -94,7 +148,11 @@ export function ListingsManager() {
     const response = await fetch(editingId ? `/api/admin/listings/${editingId}` : "/api/admin/listings", {
       method: editingId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form)
+      body: JSON.stringify({
+        ...form,
+        storefrontProductId: form.slug,
+        imageUrls: form.imageUrls.filter((url) => url && url !== form.imageUrl)
+      })
     });
     const payload = await response.json();
     setSaving(false);
@@ -119,6 +177,8 @@ export function ListingsManager() {
     setEditingId(null);
     setError(null);
   };
+
+  const allImages = form.imageUrl ? [form.imageUrl, ...form.imageUrls] : [...form.imageUrls];
 
   return (
     <div className="space-y-6">
@@ -153,12 +213,6 @@ export function ListingsManager() {
             onChange={(event) => setForm({ ...form, brand: event.target.value })}
             placeholder="Brand"
             className="rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm"
-          />
-          <input
-            value={form.storefrontProductId}
-            onChange={(event) => setForm({ ...form, storefrontProductId: event.target.value })}
-            placeholder="GHL storefront product ID"
-            className="rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm md:col-span-2"
           />
           <select
             value={form.condition}
@@ -202,29 +256,51 @@ export function ListingsManager() {
         />
 
         <div className="rounded-xl border border-white/15 p-4">
-          <p className="text-sm font-medium">Watch image</p>
+          <p className="text-sm font-medium">Watch images</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            First image becomes the main thumbnail. Additional images appear in the listing gallery.
+          </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
               onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void uploadImage(file);
+                const files = event.target.files;
+                if (files?.length) {
+                  void uploadFiles(files);
+                  event.target.value = "";
+                }
               }}
               className="text-sm"
             />
-            <span className="text-xs text-[var(--muted)]">{uploading ? "Uploading..." : "Upload to R2"}</span>
+            <span className="text-xs text-[var(--muted)]">{uploading ? "Uploading..." : "Upload one or more to R2"}</span>
           </div>
-          {form.imageUrl ? (
-            <div className="mt-4 space-y-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={form.imageUrl} alt="Listing preview" className="h-40 w-40 rounded-xl object-cover" />
-              <input
-                value={form.imageUrl}
-                onChange={(event) => setForm({ ...form, imageUrl: event.target.value })}
-                placeholder="Image URL"
-                className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm"
-              />
+
+          {allImages.length > 0 ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+              {allImages.map((url, index) => {
+                const isMain = url === form.imageUrl;
+                return (
+                  <div key={`${url}-${index}`} className="rounded-xl border border-white/10 p-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={isMain ? "Main thumbnail" : `Additional ${index}`} className="h-32 w-full rounded-lg object-cover" />
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs text-[var(--muted)]">{isMain ? "Main / thumbnail" : "Additional"}</span>
+                      <div className="flex gap-2">
+                        {!isMain ? (
+                          <button type="button" className="text-xs text-[var(--brand-a)]" onClick={() => makeMain(url)}>
+                            Make main
+                          </button>
+                        ) : null}
+                        <button type="button" className="text-xs text-red-300" onClick={() => removeImage(url)}>
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : null}
         </div>
@@ -254,6 +330,7 @@ export function ListingsManager() {
               <p className="font-medium">{listing.name}</p>
               <p className="text-sm text-[var(--muted)]">
                 {listing.brand} • ${listing.priceUsd.toLocaleString()} • {listing.published ? "Published" : "Draft"}
+                {(listing.imageUrls?.length ?? 0) > 0 ? ` • ${1 + listing.imageUrls.length} images` : ""}
               </p>
               <p className="text-xs text-[var(--muted)]">/{listing.slug}</p>
             </div>
@@ -264,7 +341,6 @@ export function ListingsManager() {
                 onClick={() => {
                   setEditingId(listing._id);
                   setForm({
-                    storefrontProductId: listing.storefrontProductId,
                     slug: listing.slug,
                     name: listing.name,
                     brand: listing.brand,
@@ -272,6 +348,7 @@ export function ListingsManager() {
                     year: listing.year,
                     priceUsd: listing.priceUsd,
                     imageUrl: listing.imageUrl,
+                    imageUrls: Array.isArray(listing.imageUrls) ? listing.imageUrls : [],
                     description: listing.description,
                     published: listing.published
                   });

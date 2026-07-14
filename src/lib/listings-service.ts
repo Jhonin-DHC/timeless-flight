@@ -14,7 +14,7 @@ export async function getPublishedListings(): Promise<PublicListing[]> {
 
     return docs.map((doc) => ({
       id: doc._id.toString(),
-      storefrontProductId: doc.storefrontProductId,
+      storefrontProductId: doc.storefrontProductId || doc.slug,
       slug: doc.slug,
       name: doc.name,
       brand: doc.brand,
@@ -22,6 +22,7 @@ export async function getPublishedListings(): Promise<PublicListing[]> {
       year: doc.year,
       priceUsd: doc.priceUsd,
       imageUrl: doc.imageUrl,
+      imageUrls: Array.isArray(doc.imageUrls) ? doc.imageUrls : [],
       description: doc.description,
       published: doc.published
     }));

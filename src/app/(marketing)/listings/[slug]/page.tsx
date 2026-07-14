@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
+import { ListingImageGallery } from "@/components/listing-image-gallery";
 import { ListingModalTrigger } from "@/components/listing-modal-trigger";
 import { getListingBySlug } from "@/lib/listings-service";
-import Image from "next/image";
 
 interface ListingDetailProps {
   params: Promise<{ slug: string }>;
@@ -19,9 +19,7 @@ export default async function ListingDetailPage({ params }: ListingDetailProps) 
 
   return (
     <article className="glass-panel space-y-6">
-      <div className="relative h-[300px] w-full overflow-hidden rounded-2xl md:h-[420px]">
-        <Image src={listing.imageUrl} alt={listing.name} fill className="object-cover" sizes="(max-width: 768px) 100vw, 80vw" priority />
-      </div>
+      <ListingImageGallery name={listing.name} imageUrl={listing.imageUrl} imageUrls={listing.imageUrls} />
       <div className="space-y-4">
         <h1 className="section-title">{listing.name}</h1>
         <p className="section-copy">{listing.description}</p>

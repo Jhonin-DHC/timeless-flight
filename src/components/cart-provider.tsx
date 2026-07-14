@@ -27,18 +27,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
 
   const addItem = (listing: Listing) => {
+    const productId = listing.storefrontProductId || listing.slug || listing.id;
     setItems((previous) => {
-      const existing = previous.find((item) => item.productId === listing.storefrontProductId);
+      const existing = previous.find((item) => item.productId === productId);
       if (existing) {
         return previous.map((item) =>
-          item.productId === listing.storefrontProductId ? { ...item, quantity: item.quantity + 1 } : item
+          item.productId === productId ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
 
       return [
         ...previous,
         {
-          productId: listing.storefrontProductId,
+          productId,
           listingId: listing.id,
           name: listing.name,
           price: listing.priceUsd,

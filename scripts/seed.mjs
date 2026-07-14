@@ -9,7 +9,7 @@ if (!uri) {
 
 const listings = [
   {
-    storefrontProductId: "ghl_prod_rolex_submariner_126610ln",
+    storefrontProductId: "rolex-submariner-date-126610ln",
     slug: "rolex-submariner-date-126610ln",
     name: "Rolex Submariner Date 126610LN",
     brand: "Rolex",
@@ -17,6 +17,7 @@ const listings = [
     year: 2023,
     priceUsd: 14250,
     imageUrl: "https://images.unsplash.com/photo-1524592094714-0f0654e20314",
+    imageUrls: [],
     description: "Ceramic bezel diver with full set and sharp case lines.",
     published: true
   }

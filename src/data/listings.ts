@@ -1,6 +1,6 @@
 export interface Listing {
   id: string;
-  storefrontProductId: string;
+  storefrontProductId?: string;
   slug: string;
   name: string;
   brand: string;
@@ -8,6 +8,8 @@ export interface Listing {
   year: number;
   priceUsd: number;
   imageUrl: string;
+  /** Additional images after the main thumbnail (`imageUrl`). */
+  imageUrls?: string[];
   description: string;
 }
 

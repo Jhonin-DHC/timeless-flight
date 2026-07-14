@@ -2,7 +2,7 @@ import mongoose, { Schema, models } from "mongoose";
 
 const ListingSchema = new Schema(
   {
-    storefrontProductId: { type: String, required: true },
+    storefrontProductId: { type: String, default: "" },
     slug: { type: String, required: true, unique: true },
     name: { type: String, required: true },
     brand: { type: String, required: true },
@@ -10,6 +10,7 @@ const ListingSchema = new Schema(
     year: { type: Number, required: true },
     priceUsd: { type: Number, required: true },
     imageUrl: { type: String, required: true },
+    imageUrls: { type: [String], default: [] },
     description: { type: String, required: true },
     published: { type: Boolean, default: true },
     buyChannel: { type: String, enum: ["ghl", "ebay"], default: "ghl" },
