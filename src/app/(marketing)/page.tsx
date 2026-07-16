@@ -19,6 +19,7 @@ export default async function HomePage() {
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/listings" className="btn-gradient-primary">Shop listings</Link>
+          <Link href="/sell" className="btn-gradient-secondary">Sell your watch</Link>
           <Link href="/about" className="btn-gradient-secondary">About Timeless Flight</Link>
         </div>
       </section>
