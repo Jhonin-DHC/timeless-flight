@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 
-type Step = "items" | "contact" | "review" | "done";
+type Step = "email" | "verify" | "items" | "contact" | "review" | "done";
 
 interface SellFormState {
   email: string;
+  emailVerified: boolean;
   description: string;
   photoUrls: string[];
   firstName: string;
@@ -15,11 +16,11 @@ interface SellFormState {
   phoneCountryCode: string;
   country: string;
   zipCode: string;
-  privacyAccepted: boolean;
 }
 
 const initialState: SellFormState = {
   email: "",
+  emailVerified: false,
   description: "",
   photoUrls: [],
   firstName: "",
@@ -27,23 +28,81 @@ const initialState: SellFormState = {
   phone: "",
   phoneCountryCode: "+1",
   country: "United States",
-  zipCode: "",
-  privacyAccepted: false
+  zipCode: ""
+};
+
+const stepLabels: Record<Exclude<Step, "done">, string> = {
+  email: "1. Email",
+  verify: "2. Verify",
+  items: "3. Items",
+  contact: "4. Contact",
+  review: "5. Review"
 };
 
 export function SellIntakeForm() {
-  const [step, setStep] = useState<Step>("items");
+  const [step, setStep] = useState<Step>("email");
   const [form, setForm] = useState<SellFormState>(initialState);
+  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
 
+  const requestCode = async () => {
+    setBusy(true);
+    setError(null);
+    const response = await fetch("/api/sell/send-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: form.email })
+    });
+    const payload = await response.json();
+    setBusy(false);
+    if (!response.ok) {
+      setError(payload.error ?? "Could not send verification code.");
+      return false;
+    }
+    setForm((current) => ({ ...current, email: payload.email, emailVerified: false }));
+    return true;
+  };
+
+  const sendCode = async (event: FormEvent) => {
+    event.preventDefault();
+    const ok = await requestCode();
+    if (ok) setStep("verify");
+  };
+
+  const verifyCode = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    const response = await fetch("/api/sell/verify-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: form.email, code })
+    });
+    const payload = await response.json();
+    setBusy(false);
+    if (!response.ok) {
+      setError(payload.error ?? "Verification failed.");
+      return;
+    }
+    setForm((current) => ({ ...current, emailVerified: true }));
+    setStep("items");
+  };
+
   const uploadPhotos = async (files: FileList | null) => {
     if (!files?.length) return;
+    const remaining = 5 - form.photoUrls.length;
+    if (remaining <= 0) {
+      setError("You can upload a maximum of 5 photos.");
+      return;
+    }
+
+    const selected = Array.from(files).slice(0, remaining);
     setUploading(true);
     setError(null);
     const urls: string[] = [];
-    for (const file of Array.from(files)) {
+    for (const file of selected) {
       const body = new FormData();
       body.append("file", file);
       const response = await fetch("/api/sell/uploads", { method: "POST", body });
@@ -55,8 +114,11 @@ export function SellIntakeForm() {
       }
       urls.push(payload.url as string);
     }
-    setForm((current) => ({ ...current, photoUrls: [...current.photoUrls, ...urls].slice(0, 12) }));
+    setForm((current) => ({ ...current, photoUrls: [...current.photoUrls, ...urls].slice(0, 5) }));
     setUploading(false);
+    if (files.length > remaining) {
+      setError(`Only ${remaining} more photo${remaining === 1 ? "" : "s"} could be added (max 5).`);
+    }
   };
 
   const continueFromItems = () => {
@@ -95,14 +157,67 @@ export function SellIntakeForm() {
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="text-center">
         <p className="text-sm uppercase tracking-[0.2em] text-[var(--brand-c)]">Sell your watch</p>
-        <div className="mt-4 flex items-center justify-center gap-2 text-xs text-[var(--muted)]">
-          <span className={step === "items" ? "text-[var(--brand-a)]" : ""}>1. Items</span>
-          <span>•</span>
-          <span className={step === "contact" ? "text-[var(--brand-a)]" : ""}>2. Contact</span>
-          <span>•</span>
-          <span className={step === "review" || step === "done" ? "text-[var(--brand-a)]" : ""}>3. Review</span>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-[var(--muted)]">
+          {(Object.keys(stepLabels) as Array<keyof typeof stepLabels>).map((key, index, list) => (
+            <span key={key} className="inline-flex items-center gap-2">
+              <span className={step === key || (step === "done" && key === "review") ? "text-[var(--brand-a)]" : ""}>
+                {stepLabels[key]}
+              </span>
+              {index < list.length - 1 ? <span>•</span> : null}
+            </span>
+          ))}
         </div>
       </div>
+
+      {step === "email" ? (
+        <form onSubmit={sendCode} className="glass-panel space-y-6">
+          <div className="text-center">
+            <h1 className="section-title">Enter your email to continue</h1>
+            <p className="section-copy mt-3">We&apos;ll send a verification code, then ask for your watch details.</p>
+          </div>
+          <input
+            type="email"
+            required
+            value={form.email}
+            onChange={(event) => setForm({ ...form, email: event.target.value, emailVerified: false })}
+            placeholder="Type your email here..."
+            className="w-full rounded-xl border border-white/15 bg-transparent px-4 py-3 text-sm"
+          />
+          <button type="submit" disabled={busy} className="btn-gradient-primary">
+            {busy ? "Sending code..." : "Continue"}
+          </button>
+        </form>
+      ) : null}
+
+      {step === "verify" ? (
+        <form onSubmit={verifyCode} className="glass-panel space-y-6">
+          <div className="text-center">
+            <h1 className="section-title">Enter your verification code</h1>
+            <p className="section-copy mt-3">
+              We sent a code to <span className="text-[var(--foreground)]">{form.email}</span>.
+            </p>
+          </div>
+          <input
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+            placeholder="Enter code"
+            inputMode="numeric"
+            required
+            className="w-full rounded-xl border border-white/15 bg-transparent px-4 py-3 text-sm"
+          />
+          <div className="flex flex-wrap gap-3">
+            <button type="button" className="btn-gradient-secondary" disabled={busy} onClick={() => setStep("email")}>
+              Back
+            </button>
+            <button type="submit" disabled={busy} className="btn-gradient-primary">
+              {busy ? "Verifying..." : "Continue"}
+            </button>
+          </div>
+          <button type="button" className="text-sm text-[var(--brand-a)]" disabled={busy} onClick={() => void requestCode()}>
+            Resend code
+          </button>
+        </form>
+      ) : null}
 
       {step === "items" ? (
         <section className="glass-panel space-y-6">
@@ -120,7 +235,7 @@ export function SellIntakeForm() {
             className="w-full rounded-xl border border-white/15 bg-transparent px-4 py-3 text-sm"
           />
           <div>
-            <p className="mb-3 text-sm font-medium">Add photos</p>
+            <p className="mb-3 text-sm font-medium">Add photos ({form.photoUrls.length}/5)</p>
             <div className="flex flex-wrap gap-3">
               {form.photoUrls.map((url) => (
                 <div key={url} className="relative h-20 w-20 overflow-hidden rounded-xl border border-white/15">
@@ -140,19 +255,21 @@ export function SellIntakeForm() {
                   </button>
                 </div>
               ))}
-              <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/25 text-xs text-[var(--muted)] hover:border-[var(--brand-a)]">
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  multiple
-                  className="hidden"
-                  onChange={(event) => {
-                    void uploadPhotos(event.target.files);
-                    event.target.value = "";
-                  }}
-                />
-                {uploading ? "…" : "+ Photo"}
-              </label>
+              {form.photoUrls.length < 5 ? (
+                <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-xl border border-dashed border-white/25 text-xs text-[var(--muted)] hover:border-[var(--brand-a)]">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    multiple
+                    className="hidden"
+                    onChange={(event) => {
+                      void uploadPhotos(event.target.files);
+                      event.target.value = "";
+                    }}
+                  />
+                  {uploading ? "…" : "+ Photo"}
+                </label>
+              ) : null}
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -194,15 +311,9 @@ export function SellIntakeForm() {
                 onChange={(event) => setForm({ ...form, lastName: event.target.value })}
               />
             </label>
-            <label className="space-y-1.5 text-sm">
-              <span className="text-[var(--muted)]">Email</span>
-              <input
-                required
-                type="email"
-                className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2"
-                value={form.email}
-                onChange={(event) => setForm({ ...form, email: event.target.value })}
-              />
+            <label className="space-y-1.5 text-sm md:col-span-2">
+              <span className="text-[var(--muted)]">Email (verified)</span>
+              <input required type="email" readOnly className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2" value={form.email} />
             </label>
             <label className="space-y-1.5 text-sm">
               <span className="text-[var(--muted)]">Mobile phone</span>
@@ -239,7 +350,7 @@ export function SellIntakeForm() {
                 <option>Singapore</option>
               </select>
             </label>
-            <label className="space-y-1.5 text-sm">
+            <label className="space-y-1.5 text-sm md:col-span-2">
               <span className="text-[var(--muted)]">Zip / Postal code</span>
               <input
                 required
@@ -318,30 +429,11 @@ export function SellIntakeForm() {
               <p className="text-sm text-[var(--muted)]">{form.description || "No description"}</p>
             </div>
           </div>
-          <label className="flex items-start justify-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={form.privacyAccepted}
-              onChange={(event) => setForm({ ...form, privacyAccepted: event.target.checked })}
-            />
-            <span>
-              By submitting, you agree to our{" "}
-              <Link href="/resources/legal" className="text-[var(--brand-a)]">
-                privacy policy
-              </Link>
-              .
-            </span>
-          </label>
           <div className="flex flex-wrap justify-center gap-3">
             <button type="button" className="btn-gradient-secondary" onClick={() => setStep("contact")}>
               Back
             </button>
-            <button
-              type="button"
-              className="btn-gradient-primary"
-              disabled={busy || !form.privacyAccepted}
-              onClick={submit}
-            >
+            <button type="button" className="btn-gradient-primary" disabled={busy} onClick={submit}>
               {busy ? "Submitting..." : "Submit"}
             </button>
           </div>
@@ -361,26 +453,6 @@ export function SellIntakeForm() {
       ) : null}
 
       {error ? <p className="text-center text-sm text-red-300">{error}</p> : null}
-
-      {(step === "items" || step === "contact") && (
-        <section className="glass-panel space-y-5">
-          <h2 className="section-title">How it works</h2>
-          <ol className="space-y-4 text-sm text-[var(--muted)]">
-            <li>
-              <strong className="text-[var(--foreground)]">1. Tell us about your watch</strong>
-              <p>Share model details, condition notes, and photos.</p>
-            </li>
-            <li>
-              <strong className="text-[var(--foreground)]">2. Leave your contact details</strong>
-              <p>We&apos;ll reach out with next steps for evaluation.</p>
-            </li>
-            <li>
-              <strong className="text-[var(--foreground)]">3. Receive a fair offer</strong>
-              <p>Our specialists review market demand and respond promptly.</p>
-            </li>
-          </ol>
-        </section>
-      )}
     </div>
   );
 }

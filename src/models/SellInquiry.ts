@@ -1,9 +1,18 @@
 import mongoose, { Schema, models } from "mongoose";
 
+const SellReplySchema = new Schema(
+  {
+    body: { type: String, required: true },
+    createdBy: { type: String, default: "admin" },
+    createdAt: { type: Date, default: Date.now }
+  },
+  { _id: true }
+);
+
 const SellInquirySchema = new Schema(
   {
     email: { type: String, required: true, index: true },
-    verifiedAt: { type: Date },
+    emailVerifiedAt: { type: Date },
     description: { type: String, default: "" },
     photoUrls: { type: [String], default: [] },
     firstName: { type: String, default: "" },
@@ -12,14 +21,15 @@ const SellInquirySchema = new Schema(
     phoneCountryCode: { type: String, default: "+1" },
     country: { type: String, default: "United States" },
     zipCode: { type: String, default: "" },
-    appointmentAt: { type: Date },
-    appointmentLabel: { type: String, default: "" },
-    location: { type: String, default: "Timeless Flight — Virtual / By appointment" },
     status: {
       type: String,
-      enum: ["draft", "submitted"],
-      default: "draft"
+      enum: ["new", "reviewed", "replied", "closed"],
+      default: "new",
+      index: true
     },
+    isUnread: { type: Boolean, default: true, index: true },
+    adminNotes: { type: String, default: "" },
+    replies: { type: [SellReplySchema], default: [] },
     privacyAccepted: { type: Boolean, default: false }
   },
   { timestamps: true }

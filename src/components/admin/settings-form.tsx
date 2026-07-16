@@ -9,6 +9,8 @@ interface SettingsPayload {
   ebayEnv?: "sandbox" | "production";
   mongoConfigured: boolean;
   r2Configured: boolean;
+  emailConfigured?: boolean;
+  sellNotifyEmails?: string[];
 }
 
 export function SettingsForm() {
@@ -70,13 +72,18 @@ export function SettingsForm() {
       <div className="glass-card space-y-2 text-sm">
         <p>MongoDB configured: {settings.mongoConfigured ? "Yes" : "No"}</p>
         <p>R2 image uploads configured: {settings.r2Configured ? "Yes" : "No"}</p>
+        <p>SMTP email configured: {settings.emailConfigured ? "Yes" : "No"}</p>
+        <p>
+          Sell notify emails:{" "}
+          {settings.sellNotifyEmails?.length ? settings.sellNotifyEmails.join(", ") : "Not set"}
+        </p>
         <p>
           eBay API configured: {settings.ebayConfigured ? "Yes" : "No"}
           {settings.ebayConfigured && settings.ebayEnv ? ` (${settings.ebayEnv})` : ""}
         </p>
         <p className="text-[var(--muted)]">
-          Search runs are manual from Admin → Search. Use Production App ID + Cert ID for live eBay
-          listings, or set EBAY_ENV=sandbox with Sandbox keys.
+          SMTP powers sell verification codes and team alerts on new /sell submissions. Set SELL_NOTIFY_EMAILS
+          for internal recipients.
         </p>
       </div>
     </div>

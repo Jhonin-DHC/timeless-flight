@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getEbayConfigStatus } from "@/lib/ebay";
+import { getTeamNotifyEmails, isEmailConfigured } from "@/lib/email";
 import { connectMongo } from "@/lib/mongodb";
 import { isR2Configured } from "@/lib/r2";
 import { getSetting, setSetting } from "@/models/AppSettings";
@@ -17,7 +18,9 @@ export async function GET() {
         ebayConfigured: ebay.configured,
         ebayEnv: ebay.env,
         mongoConfigured: Boolean(process.env.MONGODB_URI),
-        r2Configured: isR2Configured()
+        r2Configured: isR2Configured(),
+        emailConfigured: isEmailConfigured(),
+        sellNotifyEmails: getTeamNotifyEmails()
       }
     });
   } catch (error) {
