@@ -12,7 +12,7 @@ export default async function HomePage() {
   return (
     <div className="space-y-10 md:space-y-14">
       <section className="glass-panel">
-        <p className="text-sm uppercase tracking-[0.2em] text-[var(--brand-c)]">Timeless Flight</p>
+        <p className="text-sm uppercase tracking-[0.2em] text-[var(--brand-c)]">The Aviators Watch</p>
         <h1 className="mt-3 text-4xl font-semibold leading-tight md:text-6xl">Curated watches built to outlast trends.</h1>
         <p className="section-copy mt-5 max-w-2xl">
           Browse collector-grade timepieces with transparent details, rich media, and a clean path to your future GHL-powered checkout.
@@ -20,7 +20,7 @@ export default async function HomePage() {
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href="/listings" className="btn-gradient-primary">Shop listings</Link>
           <Link href="/sell" className="btn-gradient-secondary">Sell your watch</Link>
-          <Link href="/about" className="btn-gradient-secondary">About Timeless Flight</Link>
+          <Link href="/about" className="btn-gradient-secondary">About The Aviators Watch</Link>
         </div>
       </section>
 

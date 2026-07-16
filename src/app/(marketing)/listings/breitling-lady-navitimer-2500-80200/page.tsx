@@ -72,7 +72,7 @@ const videoScript = [
   {
     time: "0:25-0:30",
     visual: "Final logo lockup over a macro of the Panda dial.",
-    audio: "The Breitling Lady Navitimer. The Icon, Condensed. Timeless Flight."
+    audio: "The Breitling Lady Navitimer. The Icon, Condensed. The Aviators Watch."
   }
 ];
 

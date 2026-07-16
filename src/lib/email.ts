@@ -108,7 +108,7 @@ export async function sendSellInquiryAlert(inquiry: {
 }
 
 export async function sendVerificationCodeEmail(email: string, code: string) {
-  const subject = "Your Timeless Flight verification code";
+  const subject = "The Aviators Watch verification code";
   const text = [
     "Use this verification code to continue your sell inquiry:",
     "",

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Timeless Flight | Curated Timepieces",
+  title: "The Aviators Watch | Curated Timepieces",
   description: "Curated luxury watches with a modern glassmorphism browsing experience."
 };
 

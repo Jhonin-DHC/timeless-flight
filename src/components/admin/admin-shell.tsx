@@ -45,7 +45,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-[#070b14] text-white">
       <div className="grid min-h-screen lg:grid-cols-[240px_1fr]">
         <aside className="border-r border-white/10 p-5">
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--brand-c)]">Timeless Flight</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--brand-c)]">The Aviators Watch</p>
           <h1 className="mt-2 text-lg font-semibold">Admin</h1>
           {unreadCount > 0 ? (
             <p className="mt-3 rounded-xl border border-[var(--brand-c)]/30 bg-[var(--brand-c)]/10 px-3 py-2 text-xs text-[var(--brand-c)]">
