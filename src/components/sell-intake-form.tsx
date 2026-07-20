@@ -157,6 +157,12 @@ export function SellIntakeForm() {
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="text-center">
         <p className="text-sm uppercase tracking-[0.2em] text-[var(--brand-c)]">Sell your watch</p>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          <Link href="/sell" className="text-[var(--brand-a)]">
+            We Buy Watches
+          </Link>{" "}
+          · Watch Intake Form
+        </p>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-[var(--muted)]">
           {(Object.keys(stepLabels) as Array<keyof typeof stepLabels>).map((key, index, list) => (
             <span key={key} className="inline-flex items-center gap-2">
