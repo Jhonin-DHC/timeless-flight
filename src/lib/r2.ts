@@ -34,9 +34,37 @@ export function isR2Configured() {
   );
 }
 
+async function assertPublicImageReachable(url: string) {
+  const help =
+    "Enable public access on the R2 bucket and confirm R2_PUBLIC_BASE_URL matches the bucket’s public r2.dev (or custom) URL.";
+
+  try {
+    const head = await fetch(url, { method: "HEAD", cache: "no-store" });
+    if (head.ok) return;
+
+    const ranged = await fetch(url, {
+      method: "GET",
+      cache: "no-store",
+      headers: { Range: "bytes=0-0" }
+    });
+    if (ranged.ok || ranged.status === 206) return;
+
+    throw new Error(`Upload succeeded, but the public image URL returned HTTP ${ranged.status}. ${help}`);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Upload succeeded")) {
+      throw error;
+    }
+    throw new Error(`Upload succeeded, but the public image URL is not reachable. ${help}`);
+  }
+}
+
 export async function uploadListingImage(file: File) {
   const { accountId, accessKeyId, secretAccessKey, bucket } = getR2Config();
   const publicBaseUrl = getPublicBaseUrl();
+
+  if (/pub-your-id\.r2\.dev/i.test(publicBaseUrl)) {
+    throw new Error("R2_PUBLIC_BASE_URL is still a placeholder. Set your real Cloudflare R2 public URL.");
+  }
 
   const extension = file.name.includes(".") ? file.name.split(".").pop() : "jpg";
   const key = `listings/${randomUUID()}-${sanitizeFilename(file.name || `watch.${extension}`)}`;
@@ -48,18 +76,23 @@ export async function uploadListingImage(file: File) {
     credentials: { accessKeyId, secretAccessKey }
   });
 
-  await client.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: buffer,
-      ContentType: file.type || "image/jpeg",
-      CacheControl: "public, max-age=31536000, immutable"
-    })
-  );
+  try {
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: file.type || "image/jpeg",
+        CacheControl: "public, max-age=31536000, immutable"
+      })
+    );
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Unknown R2 error";
+    throw new Error(`R2 upload failed: ${detail}`);
+  }
 
-  return {
-    key,
-    url: `${publicBaseUrl}/${key}`
-  };
+  const url = `${publicBaseUrl}/${key}`;
+  await assertPublicImageReachable(url);
+
+  return { key, url };
 }

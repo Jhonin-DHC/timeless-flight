@@ -54,23 +54,51 @@ export function SellIntakeForm() {
     setUploading(true);
     setError(null);
     const urls: string[] = [];
+    const failures: string[] = [];
+
     for (const file of selected) {
-      const body = new FormData();
-      body.append("file", file);
-      const response = await fetch("/api/sell/uploads", { method: "POST", body });
-      const payload = await response.json();
-      if (!response.ok) {
-        setUploading(false);
-        setError(payload.error ?? `Could not upload ${file.name}.`);
-        return;
+      try {
+        const body = new FormData();
+        body.append("file", file);
+        const response = await fetch("/api/sell/uploads", { method: "POST", body });
+        const payload = await response.json();
+        if (!response.ok || !payload.url) {
+          failures.push(`${file.name}: ${payload.error ?? "Upload failed."}`);
+          continue;
+        }
+        urls.push(payload.url as string);
+      } catch {
+        failures.push(`${file.name}: Network error while uploading.`);
       }
-      urls.push(payload.url as string);
     }
-    setForm((current) => ({ ...current, photoUrls: [...current.photoUrls, ...urls].slice(0, 5) }));
+
+    if (urls.length > 0) {
+      setForm((current) => ({ ...current, photoUrls: [...current.photoUrls, ...urls].slice(0, 5) }));
+    }
     setUploading(false);
+
+    if (failures.length > 0) {
+      const prefix =
+        urls.length > 0
+          ? `${urls.length} photo${urls.length === 1 ? "" : "s"} uploaded. Some failed: `
+          : "Photo upload failed: ";
+      setError(`${prefix}${failures.join(" ")}`);
+      return;
+    }
+
     if (files.length > remaining) {
       setError(`Only ${remaining} more photo${remaining === 1 ? "" : "s"} could be added (max 5).`);
     }
+  };
+
+  const handleImageError = (url: string) => {
+    setForm((current) => ({
+      ...current,
+      photoUrls: current.photoUrls.filter((item) => item !== url)
+    }));
+    setError(
+      "A photo could not be displayed (public image URL unreachable). Check R2 public access / R2_PUBLIC_BASE_URL, then upload again."
+    );
   };
 
   const continueFromItems = () => {
@@ -148,7 +176,12 @@ export function SellIntakeForm() {
               {form.photoUrls.map((url) => (
                 <div key={url} className="relative h-20 w-20 overflow-hidden rounded-xl border border-white/15">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    onError={() => handleImageError(url)}
+                  />
                   <button
                     type="button"
                     className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white"
@@ -335,7 +368,12 @@ export function SellIntakeForm() {
                 {form.photoUrls.map((url) => (
                   <div key={url} className="h-14 w-14 overflow-hidden rounded-lg border border-white/15">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt="" className="h-full w-full object-cover" />
+                    <img
+                    src={url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    onError={() => handleImageError(url)}
+                  />
                   </div>
                 ))}
                 {form.photoUrls.length === 0 ? <p className="text-sm text-[var(--muted)]">No photos</p> : null}

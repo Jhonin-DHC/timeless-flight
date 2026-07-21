@@ -8,7 +8,10 @@ export async function POST(request: Request) {
   try {
     if (!isR2Configured()) {
       return NextResponse.json(
-        { error: "Image uploads are not configured yet. You can continue without photos." },
+        {
+          error:
+            "Image uploads are not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, and R2_PUBLIC_BASE_URL."
+        },
         { status: 503 }
       );
     }

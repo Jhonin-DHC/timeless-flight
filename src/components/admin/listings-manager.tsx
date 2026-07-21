@@ -72,38 +72,52 @@ export function ListingsManager() {
     setError(null);
 
     const uploadedUrls: string[] = [];
+    const failures: string[] = [];
     for (const file of fileArray) {
-      const body = new FormData();
-      body.append("file", file);
-      const response = await fetch("/api/admin/uploads", {
-        method: "POST",
-        body
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        setUploading(false);
-        setError(payload.error ?? `Failed to upload ${file.name}.`);
-        return;
+      try {
+        const body = new FormData();
+        body.append("file", file);
+        const response = await fetch("/api/admin/uploads", {
+          method: "POST",
+          body
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.url) {
+          failures.push(`${file.name}: ${payload.error ?? "Upload failed."}`);
+          continue;
+        }
+        uploadedUrls.push(payload.url as string);
+      } catch {
+        failures.push(`${file.name}: Network error while uploading.`);
       }
-      uploadedUrls.push(payload.url as string);
     }
 
-    setForm((current) => {
-      const nextUrls = [...uploadedUrls];
-      if (!current.imageUrl && nextUrls.length > 0) {
-        const [main, ...rest] = nextUrls;
+    if (uploadedUrls.length > 0) {
+      setForm((current) => {
+        const nextUrls = [...uploadedUrls];
+        if (!current.imageUrl && nextUrls.length > 0) {
+          const [main, ...rest] = nextUrls;
+          return {
+            ...current,
+            imageUrl: main,
+            imageUrls: [...current.imageUrls, ...rest]
+          };
+        }
         return {
           ...current,
-          imageUrl: main,
-          imageUrls: [...current.imageUrls, ...rest]
+          imageUrls: [...current.imageUrls, ...nextUrls]
         };
-      }
-      return {
-        ...current,
-        imageUrls: [...current.imageUrls, ...nextUrls]
-      };
-    });
+      });
+    }
+
     setUploading(false);
+    if (failures.length > 0) {
+      const prefix =
+        uploadedUrls.length > 0
+          ? `${uploadedUrls.length} uploaded. Some failed: `
+          : "Image upload failed: ";
+      setError(`${prefix}${failures.join(" ")}`);
+    }
   };
 
   const makeMain = (url: string) => {
