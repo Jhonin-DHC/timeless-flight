@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectMongo } from "@/lib/mongodb";
+import { normalizePublicImageUrls } from "@/lib/r2";
 import { SellInquiry } from "@/models/SellInquiry";
 
 export async function GET(request: Request) {
@@ -18,7 +19,13 @@ export async function GET(request: Request) {
       SellInquiry.countDocuments({ isUnread: true })
     ]);
 
-    return NextResponse.json({ inquiries, unreadCount });
+    return NextResponse.json({
+      inquiries: inquiries.map((inquiry) => ({
+        ...inquiry,
+        photoUrls: normalizePublicImageUrls(Array.isArray(inquiry.photoUrls) ? inquiry.photoUrls : [])
+      })),
+      unreadCount
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load sell inquiries.";
     return NextResponse.json({ error: message }, { status: 500 });

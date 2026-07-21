@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { RemoteImage } from "@/components/remote-image";
 
 interface SellReply {
   _id?: string;
@@ -290,10 +291,9 @@ export function SellInquiriesManager() {
                         href={url}
                         target="_blank"
                         rel="noreferrer"
-                        className="overflow-hidden rounded-xl border border-white/10"
+                        className="relative block h-40 overflow-hidden rounded-xl border border-white/10"
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt="Seller upload" className="h-40 w-full object-cover" />
+                        <RemoteImage src={url} alt="Seller upload" className="object-cover" sizes="240px" />
                       </a>
                     ))}
                   </div>

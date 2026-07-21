@@ -1,4 +1,5 @@
 import { connectMongo } from "@/lib/mongodb";
+import { normalizePublicImageUrl, normalizePublicImageUrls } from "@/lib/r2";
 import { Listing } from "@/models/Listing";
 import { listings as staticListings, type Listing as StaticListing } from "@/data/listings";
 
@@ -21,8 +22,8 @@ export async function getPublishedListings(): Promise<PublicListing[]> {
       condition: doc.condition as PublicListing["condition"],
       year: doc.year,
       priceUsd: doc.priceUsd,
-      imageUrl: doc.imageUrl,
-      imageUrls: Array.isArray(doc.imageUrls) ? doc.imageUrls : [],
+      imageUrl: normalizePublicImageUrl(doc.imageUrl),
+      imageUrls: normalizePublicImageUrls(Array.isArray(doc.imageUrls) ? doc.imageUrls : []),
       description: doc.description,
       published: doc.published
     }));

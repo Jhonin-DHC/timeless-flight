@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { RemoteImage } from "@/components/remote-image";
 
 interface ListingRow {
   _id: string;
@@ -297,8 +298,14 @@ export function ListingsManager() {
                 const isMain = url === form.imageUrl;
                 return (
                   <div key={`${url}-${index}`} className="rounded-xl border border-white/10 p-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt={isMain ? "Main thumbnail" : `Additional ${index}`} className="h-32 w-full rounded-lg object-cover" />
+                    <div className="relative h-32 w-full overflow-hidden rounded-lg">
+                      <RemoteImage
+                        src={url}
+                        alt={isMain ? "Main thumbnail" : `Additional ${index}`}
+                        className="object-cover"
+                        sizes="240px"
+                      />
+                    </div>
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                       <span className="text-xs text-[var(--muted)]">{isMain ? "Main / thumbnail" : "Additional"}</span>
                       <div className="flex gap-2">
@@ -337,8 +344,9 @@ export function ListingsManager() {
         {listings.map((listing) => (
           <div key={listing._id} className="glass-card flex flex-wrap items-center gap-4">
             {listing.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={listing.imageUrl} alt={listing.name} className="h-16 w-16 rounded-lg object-cover" />
+              <div className="relative h-16 w-16 overflow-hidden rounded-lg">
+                <RemoteImage src={listing.imageUrl} alt={listing.name} className="object-cover" sizes="64px" />
+              </div>
             ) : null}
             <div className="min-w-[220px] flex-1">
               <p className="font-medium">{listing.name}</p>

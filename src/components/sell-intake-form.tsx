@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { RemoteImage } from "@/components/remote-image";
 
 type Step = "items" | "contact" | "review" | "done";
 
@@ -175,16 +176,16 @@ export function SellIntakeForm() {
             <div className="flex flex-wrap gap-3">
               {form.photoUrls.map((url) => (
                 <div key={url} className="relative h-20 w-20 overflow-hidden rounded-xl border border-white/15">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <RemoteImage
                     src={url}
                     alt=""
-                    className="h-full w-full object-cover"
+                    className="object-cover"
+                    sizes="80px"
                     onError={() => handleImageError(url)}
                   />
                   <button
                     type="button"
-                    className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white"
+                    className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs text-white"
                     onClick={() =>
                       setForm((current) => ({
                         ...current,
@@ -366,14 +367,14 @@ export function SellIntakeForm() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {form.photoUrls.map((url) => (
-                  <div key={url} className="h-14 w-14 overflow-hidden rounded-lg border border-white/15">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                    src={url}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    onError={() => handleImageError(url)}
-                  />
+                  <div key={url} className="relative h-14 w-14 overflow-hidden rounded-lg border border-white/15">
+                    <RemoteImage
+                      src={url}
+                      alt=""
+                      className="object-cover"
+                      sizes="56px"
+                      onError={() => handleImageError(url)}
+                    />
                   </div>
                 ))}
                 {form.photoUrls.length === 0 ? <p className="text-sm text-[var(--muted)]">No photos</p> : null}
