@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/components/cart-provider";
+import { RemoteImage } from "@/components/remote-image";
 import { Listing } from "@/data/listings";
 
 interface ListingCardProps {
@@ -15,7 +15,12 @@ export function ListingCard({ listing }: ListingCardProps) {
   return (
     <article className="glass-card overflow-hidden p-0">
       <div className="relative h-48 w-full">
-        <Image src={listing.imageUrl} alt={listing.name} fill className="object-cover" sizes="(max-width: 768px) 100vw, 33vw" />
+        <RemoteImage
+          src={listing.imageUrl}
+          alt={listing.name}
+          className="object-cover"
+          sizes="(max-width: 768px) 100vw, 33vw"
+        />
       </div>
       <div className="space-y-3 p-4">
         <h3 className="text-lg font-semibold">{listing.name}</h3>

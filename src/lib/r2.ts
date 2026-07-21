@@ -1,4 +1,4 @@
-import { HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 
 const LEGACY_R2_PUBLIC_HOSTS = ["pub-69760bb13cf94a5384c7371a8d805acb.r2.dev"];
@@ -29,6 +29,22 @@ function createR2Client() {
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId, secretAccessKey }
   });
+}
+
+export function isAllowedMediaKey(key: string) {
+  return Boolean(key) && key.startsWith("listings/") && !key.includes("..") && !key.includes("\\");
+}
+
+export async function getR2ObjectStream(key: string) {
+  const { bucket } = getR2Config();
+  const client = createR2Client();
+  const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  const body = result.Body?.transformToWebStream?.() ?? null;
+  return {
+    body,
+    contentType: result.ContentType || "application/octet-stream",
+    etag: result.ETag
+  };
 }
 
 function sanitizeFilename(filename: string) {

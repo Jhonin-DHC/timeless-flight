@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { RemoteImage } from "@/components/remote-image";
+import { toDisplayImageUrl } from "@/lib/r2-display";
 
 interface SellReply {
   _id?: string;
@@ -288,7 +289,7 @@ export function SellInquiriesManager() {
                     {selected.photoUrls.map((url) => (
                       <a
                         key={url}
-                        href={url}
+                        href={toDisplayImageUrl(url)}
                         target="_blank"
                         rel="noreferrer"
                         className="relative block h-40 overflow-hidden rounded-xl border border-white/10"
