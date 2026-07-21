@@ -45,7 +45,7 @@ R2_ACCOUNT_ID=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 R2_BUCKET=timeless-images
-R2_PUBLIC_BASE_URL=https://pub-your-id.r2.dev
+R2_PUBLIC_BASE_URL=https://images.theaviatorswatch.com
 ```
 
 `R2_PUBLIC_BASE_URL` is the public bucket URL from Cloudflare R2 (Settings → Public access).
