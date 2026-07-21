@@ -35,7 +35,7 @@ export default async function HomePage() {
         </p>
         <div className="mt-2 flex flex-wrap gap-3">
           <Link href="/sell/intake" className="btn-gradient-primary">
-            Start Watch Intake Form
+            Sell Your Watch Today!
           </Link>
           <Link href="/sell" className="btn-gradient-secondary">
             Learn more — We Buy Watches

@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 
-type Step = "email" | "verify" | "items" | "contact" | "review" | "done";
+type Step = "items" | "contact" | "review" | "done";
 
 interface SellFormState {
   email: string;
-  emailVerified: boolean;
   description: string;
   photoUrls: string[];
   firstName: string;
@@ -20,7 +19,6 @@ interface SellFormState {
 
 const initialState: SellFormState = {
   email: "",
-  emailVerified: false,
   description: "",
   photoUrls: [],
   firstName: "",
@@ -32,63 +30,17 @@ const initialState: SellFormState = {
 };
 
 const stepLabels: Record<Exclude<Step, "done">, string> = {
-  email: "1. Email",
-  verify: "2. Verify",
-  items: "3. Items",
-  contact: "4. Contact",
-  review: "5. Review"
+  items: "1. Items",
+  contact: "2. Contact",
+  review: "3. Review"
 };
 
 export function SellIntakeForm() {
-  const [step, setStep] = useState<Step>("email");
+  const [step, setStep] = useState<Step>("items");
   const [form, setForm] = useState<SellFormState>(initialState);
-  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
-
-  const requestCode = async () => {
-    setBusy(true);
-    setError(null);
-    const response = await fetch("/api/sell/send-code", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: form.email })
-    });
-    const payload = await response.json();
-    setBusy(false);
-    if (!response.ok) {
-      setError(payload.error ?? "Could not send verification code.");
-      return false;
-    }
-    setForm((current) => ({ ...current, email: payload.email, emailVerified: false }));
-    return true;
-  };
-
-  const sendCode = async (event: FormEvent) => {
-    event.preventDefault();
-    const ok = await requestCode();
-    if (ok) setStep("verify");
-  };
-
-  const verifyCode = async (event: FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    const response = await fetch("/api/sell/verify-code", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: form.email, code })
-    });
-    const payload = await response.json();
-    setBusy(false);
-    if (!response.ok) {
-      setError(payload.error ?? "Verification failed.");
-      return;
-    }
-    setForm((current) => ({ ...current, emailVerified: true }));
-    setStep("items");
-  };
 
   const uploadPhotos = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -174,56 +126,6 @@ export function SellIntakeForm() {
           ))}
         </div>
       </div>
-
-      {step === "email" ? (
-        <form onSubmit={sendCode} className="glass-panel space-y-6">
-          <div className="text-center">
-            <h1 className="section-title">Enter your email to continue</h1>
-            <p className="section-copy mt-3">We&apos;ll send a verification code, then ask for your watch details.</p>
-          </div>
-          <input
-            type="email"
-            required
-            value={form.email}
-            onChange={(event) => setForm({ ...form, email: event.target.value, emailVerified: false })}
-            placeholder="Type your email here..."
-            className="w-full rounded-xl border border-white/15 bg-transparent px-4 py-3 text-sm"
-          />
-          <button type="submit" disabled={busy} className="btn-gradient-primary">
-            {busy ? "Sending code..." : "Continue"}
-          </button>
-        </form>
-      ) : null}
-
-      {step === "verify" ? (
-        <form onSubmit={verifyCode} className="glass-panel space-y-6">
-          <div className="text-center">
-            <h1 className="section-title">Enter your verification code</h1>
-            <p className="section-copy mt-3">
-              We sent a code to <span className="text-[var(--foreground)]">{form.email}</span>.
-            </p>
-          </div>
-          <input
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-            placeholder="Enter code"
-            inputMode="numeric"
-            required
-            className="w-full rounded-xl border border-white/15 bg-transparent px-4 py-3 text-sm"
-          />
-          <div className="flex flex-wrap gap-3">
-            <button type="button" className="btn-gradient-secondary" disabled={busy} onClick={() => setStep("email")}>
-              Back
-            </button>
-            <button type="submit" disabled={busy} className="btn-gradient-primary">
-              {busy ? "Verifying..." : "Continue"}
-            </button>
-          </div>
-          <button type="button" className="text-sm text-[var(--brand-a)]" disabled={busy} onClick={() => void requestCode()}>
-            Resend code
-          </button>
-        </form>
-      ) : null}
 
       {step === "items" ? (
         <section className="glass-panel space-y-6">
@@ -318,8 +220,14 @@ export function SellIntakeForm() {
               />
             </label>
             <label className="space-y-1.5 text-sm md:col-span-2">
-              <span className="text-[var(--muted)]">Email (verified)</span>
-              <input required type="email" readOnly className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2" value={form.email} />
+              <span className="text-[var(--muted)]">Email</span>
+              <input
+                required
+                type="email"
+                className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2"
+                value={form.email}
+                onChange={(event) => setForm({ ...form, email: event.target.value })}
+              />
             </label>
             <label className="space-y-1.5 text-sm">
               <span className="text-[var(--muted)]">Mobile phone</span>

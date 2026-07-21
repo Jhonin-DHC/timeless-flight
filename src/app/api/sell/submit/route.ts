@@ -8,7 +8,6 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       email?: string;
-      emailVerified?: boolean;
       description?: string;
       photoUrls?: string[];
       firstName?: string;
@@ -23,9 +22,6 @@ export async function POST(request: Request) {
     if (!isValidEmail(email)) {
       return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
     }
-    if (!body.emailVerified) {
-      return NextResponse.json({ error: "Please verify your email before submitting." }, { status: 400 });
-    }
     if (!body.firstName?.trim() || !body.lastName?.trim() || !body.phone?.trim() || !body.zipCode?.trim()) {
       return NextResponse.json({ error: "Contact details are incomplete." }, { status: 400 });
     }
@@ -35,7 +31,6 @@ export async function POST(request: Request) {
     await connectMongo();
     const inquiry = await SellInquiry.create({
       email,
-      emailVerifiedAt: new Date(),
       description: body.description?.trim() ?? "",
       photoUrls,
       firstName: body.firstName.trim(),

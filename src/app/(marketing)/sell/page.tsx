@@ -66,7 +66,7 @@ export default function SellLandingPage() {
         </p>
         <div className="flex flex-wrap gap-3">
           <Link href="/sell/intake" className="btn-gradient-primary">
-            Start Watch Intake Form
+            Sell Your Watch Today!
           </Link>
           <Link href="/listings" className="btn-gradient-secondary">
             Browse current listings
