@@ -2,7 +2,12 @@ const LEGACY_R2_PUBLIC_HOSTS = ["pub-69760bb13cf94a5384c7371a8d805acb.r2.dev"];
 const KNOWN_CUSTOM_R2_HOSTS = ["images.theaviatorswatch.com"];
 
 function isAllowedMediaKey(key: string) {
-  return Boolean(key) && key.startsWith("listings/") && !key.includes("..") && !key.includes("\\");
+  return (
+    Boolean(key) &&
+    (key.startsWith("listings/") || key.startsWith("videos/")) &&
+    !key.includes("..") &&
+    !key.includes("\\")
+  );
 }
 
 function isOurR2PublicHost(hostname: string) {
@@ -31,3 +36,6 @@ export function toDisplayImageUrl(url: string) {
 export function toDisplayImageUrls(urls: string[]) {
   return urls.map(toDisplayImageUrl);
 }
+
+/** Alias for video/image R2 URLs shown in the browser. */
+export const toDisplayMediaUrl = toDisplayImageUrl;

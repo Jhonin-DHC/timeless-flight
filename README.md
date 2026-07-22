@@ -50,6 +50,8 @@ R2_PUBLIC_BASE_URL=https://images.theaviatorswatch.com
 
 `R2_PUBLIC_BASE_URL` is the public bucket URL from Cloudflare R2 (Settings → Public access).
 
+For admin video uploads (direct-to-R2), add a CORS policy on the bucket allowing `PUT` from your site origins (e.g. `https://www.theaviatorswatch.com`, `http://localhost:3000`).
+
 Upload images in **Admin → Listings** when creating/editing a watch.
 
 ## eBay search

@@ -1,4 +1,5 @@
 import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
 
 const LEGACY_R2_PUBLIC_HOSTS = ["pub-69760bb13cf94a5384c7371a8d805acb.r2.dev"];
@@ -32,18 +33,32 @@ function createR2Client() {
 }
 
 export function isAllowedMediaKey(key: string) {
-  return Boolean(key) && key.startsWith("listings/") && !key.includes("..") && !key.includes("\\");
+  return (
+    Boolean(key) &&
+    (key.startsWith("listings/") || key.startsWith("videos/")) &&
+    !key.includes("..") &&
+    !key.includes("\\")
+  );
 }
 
-export async function getR2ObjectStream(key: string) {
+export async function getR2ObjectStream(key: string, range?: string | null) {
   const { bucket } = getR2Config();
   const client = createR2Client();
-  const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  const result = await client.send(
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ...(range ? { Range: range } : {})
+    })
+  );
   const body = result.Body?.transformToWebStream?.() ?? null;
   return {
     body,
     contentType: result.ContentType || "application/octet-stream",
-    etag: result.ETag
+    etag: result.ETag,
+    contentLength: result.ContentLength,
+    contentRange: result.ContentRange,
+    acceptRanges: "bytes" as const
   };
 }
 
@@ -82,7 +97,7 @@ export function normalizePublicImageUrls(urls: string[]) {
   return urls.map(normalizePublicImageUrl);
 }
 
-export async function uploadListingImage(file: File) {
+async function putPublicObject(key: string, file: File, fallbackType: string) {
   const { bucket } = getR2Config();
   const publicBaseUrl = getPublicBaseUrl();
 
@@ -90,10 +105,9 @@ export async function uploadListingImage(file: File) {
     throw new Error("R2_PUBLIC_BASE_URL is still a placeholder. Set your real Cloudflare R2 public URL.");
   }
 
-  const extension = file.name.includes(".") ? file.name.split(".").pop() : "jpg";
-  const key = `listings/${randomUUID()}-${sanitizeFilename(file.name || `watch.${extension}`)}`;
   const buffer = Buffer.from(await file.arrayBuffer());
   const client = createR2Client();
+  const contentType = file.type || fallbackType;
 
   try {
     await client.send(
@@ -101,7 +115,7 @@ export async function uploadListingImage(file: File) {
         Bucket: bucket,
         Key: key,
         Body: buffer,
-        ContentType: file.type || "image/jpeg",
+        ContentType: contentType,
         CacheControl: "public, max-age=31536000, immutable"
       })
     );
@@ -111,5 +125,44 @@ export async function uploadListingImage(file: File) {
     throw new Error(`R2 upload failed: ${detail}`);
   }
 
-  return { key, url: `${publicBaseUrl}/${key}` };
+  return { key, url: `${publicBaseUrl}/${key}`, contentType, sizeBytes: buffer.length };
+}
+
+export async function uploadListingImage(file: File) {
+  const extension = file.name.includes(".") ? file.name.split(".").pop() : "jpg";
+  const key = `listings/${randomUUID()}-${sanitizeFilename(file.name || `watch.${extension}`)}`;
+  const uploaded = await putPublicObject(key, file, "image/jpeg");
+  return { key: uploaded.key, url: uploaded.url };
+}
+
+export async function uploadResourceVideo(file: File) {
+  const extension = file.name.includes(".") ? file.name.split(".").pop() : "mp4";
+  const key = `videos/${randomUUID()}-${sanitizeFilename(file.name || `resource.${extension}`)}`;
+  return putPublicObject(key, file, "video/mp4");
+}
+
+export async function createVideoUploadUrl(input: { filename: string; contentType: string }) {
+  const { bucket } = getR2Config();
+  const publicBaseUrl = getPublicBaseUrl();
+  const extension = input.filename.includes(".") ? input.filename.split(".").pop() : "mp4";
+  const key = `videos/${randomUUID()}-${sanitizeFilename(input.filename || `resource.${extension}`)}`;
+  const contentType = input.contentType || "video/mp4";
+  const client = createR2Client();
+
+  const uploadUrl = await getSignedUrl(
+    client,
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ContentType: contentType
+    }),
+    { expiresIn: 60 * 10 }
+  );
+
+  return {
+    key,
+    uploadUrl,
+    publicUrl: `${publicBaseUrl}/${key}`,
+    contentType
+  };
 }
