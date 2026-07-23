@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectMongo } from "@/lib/mongodb";
 import { normalizePublicImageUrl } from "@/lib/r2";
+import { extractYoutubeVideoId } from "@/lib/youtube";
 import { VideoResource } from "@/models/VideoResource";
 
 export async function GET() {
@@ -10,7 +11,7 @@ export async function GET() {
     return NextResponse.json({
       videos: videos.map((video) => ({
         ...video,
-        videoUrl: normalizePublicImageUrl(video.videoUrl)
+        videoUrl: video.videoUrl ? normalizePublicImageUrl(video.videoUrl) : ""
       }))
     });
   } catch (error) {
@@ -25,8 +26,14 @@ export async function POST(request: Request) {
     const body = await request.json();
     const title = typeof body.title === "string" ? body.title.trim() : "";
     const videoUrl = typeof body.videoUrl === "string" ? body.videoUrl.trim() : "";
-    if (!title || !videoUrl) {
-      return NextResponse.json({ error: "Title and video file are required." }, { status: 400 });
+    const youtubeInput = typeof body.youtubeVideoId === "string" ? body.youtubeVideoId.trim() : "";
+    const youtubeVideoId = extractYoutubeVideoId(youtubeInput) || youtubeInput;
+
+    if (!title) {
+      return NextResponse.json({ error: "Title is required." }, { status: 400 });
+    }
+    if (!videoUrl && !youtubeVideoId) {
+      return NextResponse.json({ error: "Upload a video file or paste a YouTube URL / video ID." }, { status: 400 });
     }
 
     const video = await VideoResource.create({
@@ -36,7 +43,9 @@ export async function POST(request: Request) {
       videoKey: typeof body.videoKey === "string" ? body.videoKey : "",
       contentType: typeof body.contentType === "string" ? body.contentType : "video/mp4",
       sizeBytes: typeof body.sizeBytes === "number" ? body.sizeBytes : 0,
+      youtubeVideoId: youtubeVideoId || "",
       published: body.published !== false,
+      featured: Boolean(body.featured),
       sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : 0
     });
 

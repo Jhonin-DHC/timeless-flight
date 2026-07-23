@@ -3,6 +3,14 @@
 import { FormEvent, useEffect, useState } from "react";
 import { prepareVideoForUpload } from "@/lib/compress-video";
 import { toDisplayMediaUrl } from "@/lib/r2-display";
+import {
+  DEFAULT_YOUTUBE_CHANNEL_CONFIG,
+  extractYoutubeVideoId,
+  parseYoutubeChannelInput,
+  type YoutubeChannelConfig,
+  youtubeEmbedUrlForChannel
+} from "@/lib/youtube";
+import { VideoPlayer } from "@/components/video-player";
 
 interface VideoRow {
   _id: string;
@@ -12,7 +20,9 @@ interface VideoRow {
   videoKey: string;
   contentType: string;
   sizeBytes: number;
+  youtubeVideoId?: string;
   published: boolean;
+  featured: boolean;
   sortOrder: number;
 }
 
@@ -23,7 +33,9 @@ const emptyForm = {
   videoKey: "",
   contentType: "video/mp4",
   sizeBytes: 0,
+  youtubeVideoId: "",
   published: true,
+  featured: false,
   sortOrder: 0
 };
 
@@ -40,6 +52,9 @@ export function VideosManager() {
   const [status, setStatus] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [ytConfig, setYtConfig] = useState<YoutubeChannelConfig>(DEFAULT_YOUTUBE_CHANNEL_CONFIG);
+  const [ytMessage, setYtMessage] = useState<string | null>(null);
+  const [ytSaving, setYtSaving] = useState(false);
 
   const load = async () => {
     const response = await fetch("/api/admin/videos");
@@ -51,8 +66,17 @@ export function VideosManager() {
     setVideos(payload.videos ?? []);
   };
 
+  const loadYoutube = async () => {
+    const response = await fetch("/api/admin/youtube-channel");
+    const payload = await response.json();
+    if (response.ok && payload.config) {
+      setYtConfig({ ...DEFAULT_YOUTUBE_CHANNEL_CONFIG, ...payload.config });
+    }
+  };
+
   useEffect(() => {
     void load();
+    void loadYoutube();
   }, []);
 
   const resetForm = () => {
@@ -122,8 +146,9 @@ export function VideosManager() {
     event.preventDefault();
     setSaving(true);
     setError(null);
-    if (!form.title.trim() || !form.videoUrl) {
-      setError("Add a title and upload a video before saving.");
+    const ytId = extractYoutubeVideoId(form.youtubeVideoId) || form.youtubeVideoId.trim();
+    if (!form.title.trim() || (!form.videoUrl && !ytId)) {
+      setError("Add a title and either upload a file or paste a YouTube URL / video ID.");
       setSaving(false);
       return;
     }
@@ -131,7 +156,7 @@ export function VideosManager() {
     const response = await fetch(editingId ? `/api/admin/videos/${editingId}` : "/api/admin/videos", {
       method: editingId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form)
+      body: JSON.stringify({ ...form, youtubeVideoId: ytId })
     });
     const payload = await response.json();
     setSaving(false);
@@ -155,17 +180,116 @@ export function VideosManager() {
     await load();
   };
 
+  const saveYoutube = async () => {
+    setYtSaving(true);
+    setYtMessage(null);
+    const parsed = parseYoutubeChannelInput(ytConfig.channelUrl || ytConfig.channelId);
+    const response = await fetch("/api/admin/youtube-channel", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...ytConfig,
+        channelUrl: ytConfig.channelUrl || parsed.channelUrl,
+        channelId: ytConfig.channelId || parsed.channelId
+      })
+    });
+    const payload = await response.json();
+    setYtSaving(false);
+    if (!response.ok) {
+      setYtMessage(payload.error ?? "Failed to save YouTube settings.");
+      return;
+    }
+    if (payload.config) setYtConfig({ ...DEFAULT_YOUTUBE_CHANNEL_CONFIG, ...payload.config });
+    setYtMessage("YouTube channel settings saved.");
+  };
+
+  const embedPreview = youtubeEmbedUrlForChannel(ytConfig);
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-semibold">Videos</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          Upload videos for the public Resources → Videos page. Files over 50MB are auto-compressed in the browser when
-          possible (target ≤50MB, ~720p).
+          Upload R2 videos or link YouTube clips for Resources → Videos. Mark featured items for the homepage. Wire your
+          channel below when ready.
         </p>
       </div>
 
+      <div className="glass-card space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold">YouTube channel plugin</h3>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Paste your channel URL or UC… channel ID. Enable when you want the Videos page to show the channel embed.
+          </p>
+        </div>
+        <label className="inline-flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={ytConfig.enabled}
+            onChange={(event) => setYtConfig((current) => ({ ...current, enabled: event.target.checked }))}
+          />
+          Show YouTube channel section on /resources/videos
+        </label>
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="block space-y-1 text-sm md:col-span-2">
+            <span>Channel URL or @handle</span>
+            <input
+              value={ytConfig.channelUrl}
+              onChange={(event) => {
+                const value = event.target.value;
+                const parsed = parseYoutubeChannelInput(value);
+                setYtConfig((current) => ({
+                  ...current,
+                  channelUrl: value,
+                  channelId: current.channelId || parsed.channelId
+                }));
+              }}
+              placeholder="https://www.youtube.com/@YourChannel"
+              className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2"
+            />
+          </label>
+          <label className="block space-y-1 text-sm">
+            <span>Channel ID (UC…)</span>
+            <input
+              value={ytConfig.channelId}
+              onChange={(event) => setYtConfig((current) => ({ ...current, channelId: event.target.value.trim() }))}
+              placeholder="UCxxxxxxxxxxxxxxxxxxxxxx"
+              className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2"
+            />
+          </label>
+          <label className="block space-y-1 text-sm">
+            <span>Playlist ID (optional override)</span>
+            <input
+              value={ytConfig.playlistId}
+              onChange={(event) => setYtConfig((current) => ({ ...current, playlistId: event.target.value.trim() }))}
+              placeholder="UU… or custom playlist"
+              className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2"
+            />
+          </label>
+          <label className="block space-y-1 text-sm md:col-span-2">
+            <span>Section title</span>
+            <input
+              value={ytConfig.sectionTitle}
+              onChange={(event) => setYtConfig((current) => ({ ...current, sectionTitle: event.target.value }))}
+              className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2"
+            />
+          </label>
+        </div>
+        <p className="text-xs text-[var(--muted)]">
+          Tip: open your channel → Share → Copy channel ID (UC…). That unlocks the uploads playlist embed. Without it,
+          visitors still get a Visit channel link.
+        </p>
+        {embedPreview ? (
+          <p className="text-xs text-[var(--brand-c)]">Embed ready: channel uploads playlist detected.</p>
+        ) : null}
+        <button type="button" onClick={() => void saveYoutube()} disabled={ytSaving} className="btn-gradient-secondary text-sm">
+          {ytSaving ? "Saving…" : "Save YouTube channel"}
+        </button>
+        {ytMessage ? <p className="text-sm text-[var(--muted)]">{ytMessage}</p> : null}
+      </div>
+
       <form onSubmit={save} className="glass-card space-y-4">
+        <h3 className="text-lg font-semibold">{editingId ? "Edit video" : "Add video"}</h3>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block space-y-1 text-sm">
             <span>Title</span>
@@ -200,7 +324,7 @@ export function VideosManager() {
         </label>
 
         <div className="space-y-2">
-          <p className="text-sm font-medium">Video file (MP4 / WebM / MOV · max 50MB after compress)</p>
+          <p className="text-sm font-medium">Upload file (MP4 / WebM / MOV · max 50MB after compress)</p>
           <input
             type="file"
             accept="video/mp4,video/webm,video/quicktime"
@@ -228,14 +352,34 @@ export function VideosManager() {
           ) : null}
         </div>
 
-        <label className="inline-flex items-center gap-2 text-sm">
+        <label className="block space-y-1 text-sm">
+          <span>Or YouTube URL / video ID</span>
           <input
-            type="checkbox"
-            checked={form.published}
-            onChange={(event) => setForm((current) => ({ ...current, published: event.target.checked }))}
+            value={form.youtubeVideoId}
+            onChange={(event) => setForm((current) => ({ ...current, youtubeVideoId: event.target.value }))}
+            placeholder="https://www.youtube.com/watch?v=… or 11-char id"
+            className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2"
           />
-          Published on /resources/videos
         </label>
+
+        <div className="flex flex-wrap gap-4">
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.published}
+              onChange={(event) => setForm((current) => ({ ...current, published: event.target.checked }))}
+            />
+            Published on /resources/videos
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.featured}
+              onChange={(event) => setForm((current) => ({ ...current, featured: event.target.checked }))}
+            />
+            Featured on homepage
+          </label>
+        </div>
 
         <div className="flex flex-wrap gap-3">
           <button type="submit" disabled={saving || uploading} className="btn-gradient-primary text-sm">
@@ -255,18 +399,19 @@ export function VideosManager() {
         {videos.map((video) => (
           <div key={video._id} className="glass-card flex flex-wrap items-start gap-4">
             <div className="w-full max-w-xs shrink-0 overflow-hidden rounded-lg bg-black sm:w-48">
-              <video
-                src={toDisplayMediaUrl(video.videoUrl)}
-                controls
-                playsInline
-                preload="metadata"
+              <VideoPlayer
+                title={video.title}
+                videoUrl={video.videoUrl}
+                youtubeVideoId={video.youtubeVideoId}
                 className="aspect-video w-full"
               />
             </div>
             <div className="min-w-[220px] flex-1">
               <p className="font-medium">{video.title}</p>
               <p className="text-sm text-[var(--muted)]">
-                {video.published ? "Published" : "Draft"} · {formatMb(video.sizeBytes)}
+                {video.published ? "Published" : "Draft"}
+                {video.featured ? " · Featured" : ""}
+                {video.youtubeVideoId ? " · YouTube" : ` · ${formatMb(video.sizeBytes)}`}
               </p>
               <p className="mt-1 text-sm text-[var(--muted)]">{video.description || "No description"}</p>
             </div>
@@ -283,7 +428,9 @@ export function VideosManager() {
                     videoKey: video.videoKey || "",
                     contentType: video.contentType || "video/mp4",
                     sizeBytes: video.sizeBytes || 0,
+                    youtubeVideoId: video.youtubeVideoId || "",
                     published: video.published,
+                    featured: Boolean(video.featured),
                     sortOrder: video.sortOrder || 0
                   });
                   setError(null);
@@ -299,7 +446,7 @@ export function VideosManager() {
           </div>
         ))}
         {videos.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">No videos yet. Upload one to populate the public page.</p>
+          <p className="text-sm text-[var(--muted)]">No videos yet. Upload one or link a YouTube clip.</p>
         ) : null}
       </div>
     </div>

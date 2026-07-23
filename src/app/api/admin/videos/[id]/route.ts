@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectMongo } from "@/lib/mongodb";
+import { extractYoutubeVideoId } from "@/lib/youtube";
 import { VideoResource } from "@/models/VideoResource";
 
 interface RouteProps {
@@ -18,7 +19,12 @@ export async function PUT(request: Request, { params }: RouteProps) {
     if (typeof body.videoKey === "string") update.videoKey = body.videoKey;
     if (typeof body.contentType === "string") update.contentType = body.contentType;
     if (typeof body.sizeBytes === "number") update.sizeBytes = body.sizeBytes;
+    if (typeof body.youtubeVideoId === "string") {
+      const parsed = extractYoutubeVideoId(body.youtubeVideoId.trim());
+      update.youtubeVideoId = parsed || body.youtubeVideoId.trim();
+    }
     if (typeof body.published === "boolean") update.published = body.published;
+    if (typeof body.featured === "boolean") update.featured = body.featured;
     if (typeof body.sortOrder === "number") update.sortOrder = body.sortOrder;
 
     const video = await VideoResource.findByIdAndUpdate(id, update, { new: true });

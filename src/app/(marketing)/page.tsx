@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { ListingCard } from "@/components/listing-card";
 import { PortfolioCard } from "@/components/portfolio-card";
+import { VideoPlayer } from "@/components/video-player";
 import { getPublishedListings } from "@/lib/listings-service";
+import { getFeaturedVideos } from "@/lib/videos-service";
 import { portfolioCategories } from "@/data/portfolio";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const listings = await getPublishedListings();
+  const [listings, featuredVideos] = await Promise.all([getPublishedListings(), getFeaturedVideos(3)]);
 
   return (
     <div className="space-y-10 md:space-y-14">
@@ -59,6 +61,38 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
+
+      {featuredVideos.length > 0 ? (
+        <section className="space-y-5">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h2 className="section-title">Featured videos</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">Watch buying notes and market guides from our desk.</p>
+            </div>
+            <Link href="/resources/videos" className="text-sm text-[var(--brand-a)]">
+              All videos
+            </Link>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {featuredVideos.map((video) => (
+              <article key={video.id} className="space-y-3">
+                <VideoPlayer
+                  title={video.title}
+                  videoUrl={video.videoUrl}
+                  youtubeVideoId={video.youtubeVideoId}
+                  className="aspect-video w-full rounded-2xl bg-black"
+                />
+                <div>
+                  <h3 className="font-semibold">{video.title}</h3>
+                  {video.description ? (
+                    <p className="mt-1 line-clamp-2 text-sm text-[var(--muted)]">{video.description}</p>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="space-y-5">
         <h2 className="section-title">Portfolio categories</h2>
