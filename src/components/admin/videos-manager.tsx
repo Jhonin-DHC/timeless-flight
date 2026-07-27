@@ -47,6 +47,7 @@ function formatMb(bytes: number) {
 export function VideosManager() {
   const [videos, setVideos] = useState<VideoRow[]>([]);
   const [form, setForm] = useState(emptyForm);
+  const [sourceMode, setSourceMode] = useState<"youtube" | "file">("youtube");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -82,6 +83,7 @@ export function VideosManager() {
   const resetForm = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setSourceMode("youtube");
     setError(null);
     setStatus(null);
   };
@@ -131,8 +133,10 @@ export function VideosManager() {
         videoUrl: signed.publicUrl as string,
         videoKey: (signed.key as string) || "",
         contentType: (signed.contentType as string) || prepared.file.type || "video/mp4",
-        sizeBytes: prepared.file.size
+        sizeBytes: prepared.file.size,
+        youtubeVideoId: ""
       }));
+      setSourceMode("file");
       setStatus(prepared.compressed ? `${prepared.note} Upload complete.` : "Upload complete.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed.");
@@ -146,9 +150,25 @@ export function VideosManager() {
     event.preventDefault();
     setSaving(true);
     setError(null);
-    const ytId = extractYoutubeVideoId(form.youtubeVideoId) || form.youtubeVideoId.trim();
-    if (!form.title.trim() || (!form.videoUrl && !ytId)) {
-      setError("Add a title and either upload a file or paste a YouTube URL / video ID.");
+    const ytId = extractYoutubeVideoId(form.youtubeVideoId) || "";
+    const payloadBody =
+      sourceMode === "youtube"
+        ? {
+            ...form,
+            youtubeVideoId: ytId,
+            videoUrl: "",
+            videoKey: "",
+            sizeBytes: 0,
+            contentType: "video/youtube"
+          }
+        : { ...form, youtubeVideoId: "" };
+
+    if (!form.title.trim() || (sourceMode === "youtube" ? !ytId : !form.videoUrl)) {
+      setError(
+        sourceMode === "youtube"
+          ? "Add a title and a valid YouTube video URL."
+          : "Add a title and upload a video file."
+      );
       setSaving(false);
       return;
     }
@@ -156,7 +176,7 @@ export function VideosManager() {
     const response = await fetch(editingId ? `/api/admin/videos/${editingId}` : "/api/admin/videos", {
       method: editingId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, youtubeVideoId: ytId })
+      body: JSON.stringify(payloadBody)
     });
     const payload = await response.json();
     setSaving(false);
@@ -210,8 +230,8 @@ export function VideosManager() {
       <div>
         <h2 className="text-2xl font-semibold">Videos</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          Upload R2 videos or link YouTube clips for Resources → Videos. Mark featured items for the homepage. Wire your
-          channel below when ready.
+          Add YouTube embeds by URL, or upload files to R2. Check Featured on homepage for either type. Optional channel
+          embed lives below.
         </p>
       </div>
 
@@ -323,44 +343,96 @@ export function VideosManager() {
           />
         </label>
 
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Upload file (MP4 / WebM / MOV · max 50MB after compress)</p>
-          <input
-            type="file"
-            accept="video/mp4,video/webm,video/quicktime"
-            disabled={uploading}
-            onChange={(event) => {
-              void uploadVideo(event.target.files);
-              event.target.value = "";
-            }}
-            className="text-sm"
-          />
-          {status ? <p className="text-xs text-[var(--brand-c)]">{status}</p> : null}
-          {form.videoUrl ? (
-            <div className="space-y-2 rounded-xl border border-white/10 p-3">
-              <p className="text-xs text-[var(--muted)]">
-                {formatMb(form.sizeBytes)} · {form.contentType}
-              </p>
-              <video
-                key={form.videoUrl}
-                src={toDisplayMediaUrl(form.videoUrl)}
-                controls
-                playsInline
-                className="max-h-64 w-full rounded-lg bg-black"
-              />
-            </div>
-          ) : null}
-        </div>
+        <div className="space-y-3">
+          <p className="text-sm font-medium">Video source</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={`rounded-xl px-3 py-2 text-sm ${
+                sourceMode === "youtube" ? "bg-white/15 text-white" : "text-[var(--muted)] hover:bg-white/10"
+              }`}
+              onClick={() => setSourceMode("youtube")}
+            >
+              YouTube URL (embed)
+            </button>
+            <button
+              type="button"
+              className={`rounded-xl px-3 py-2 text-sm ${
+                sourceMode === "file" ? "bg-white/15 text-white" : "text-[var(--muted)] hover:bg-white/10"
+              }`}
+              onClick={() => setSourceMode("file")}
+            >
+              Upload file (R2)
+            </button>
+          </div>
 
-        <label className="block space-y-1 text-sm">
-          <span>Or YouTube URL / video ID</span>
-          <input
-            value={form.youtubeVideoId}
-            onChange={(event) => setForm((current) => ({ ...current, youtubeVideoId: event.target.value }))}
-            placeholder="https://www.youtube.com/watch?v=… or 11-char id"
-            className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2"
-          />
-        </label>
+          {sourceMode === "youtube" ? (
+            <div className="space-y-3">
+              <label className="block space-y-1 text-sm">
+                <span>YouTube video URL</span>
+                <input
+                  value={form.youtubeVideoId}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      youtubeVideoId: event.target.value,
+                      // Prefer YouTube embed over a previous file when linking a clip.
+                      videoUrl: extractYoutubeVideoId(event.target.value) ? "" : current.videoUrl,
+                      videoKey: extractYoutubeVideoId(event.target.value) ? "" : current.videoKey
+                    }))
+                  }
+                  placeholder="https://www.youtube.com/watch?v=…  or  youtu.be/…  or  11-char id"
+                  className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2"
+                />
+              </label>
+              {extractYoutubeVideoId(form.youtubeVideoId) ? (
+                <div className="overflow-hidden rounded-xl border border-white/10 bg-black">
+                  <VideoPlayer
+                    title={form.title || "YouTube preview"}
+                    youtubeVideoId={form.youtubeVideoId}
+                    className="aspect-video max-h-72 w-full"
+                  />
+                  <p className="px-3 py-2 text-xs text-[var(--muted)]">
+                    Embed preview · can be featured on the homepage
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--muted)]">
+                  Paste a watch / share / embed URL. The video will play inline on the site (and homepage if featured).
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm text-[var(--muted)]">MP4 / WebM / MOV · max 50MB after compress</p>
+              <input
+                type="file"
+                accept="video/mp4,video/webm,video/quicktime"
+                disabled={uploading}
+                onChange={(event) => {
+                  void uploadVideo(event.target.files);
+                  event.target.value = "";
+                }}
+                className="text-sm"
+              />
+              {status ? <p className="text-xs text-[var(--brand-c)]">{status}</p> : null}
+              {form.videoUrl ? (
+                <div className="space-y-2 rounded-xl border border-white/10 p-3">
+                  <p className="text-xs text-[var(--muted)]">
+                    {formatMb(form.sizeBytes)} · {form.contentType}
+                  </p>
+                  <video
+                    key={form.videoUrl}
+                    src={toDisplayMediaUrl(form.videoUrl)}
+                    controls
+                    playsInline
+                    className="max-h-64 w-full rounded-lg bg-black"
+                  />
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
 
         <div className="flex flex-wrap gap-4">
           <label className="inline-flex items-center gap-2 text-sm">
@@ -377,7 +449,7 @@ export function VideosManager() {
               checked={form.featured}
               onChange={(event) => setForm((current) => ({ ...current, featured: event.target.checked }))}
             />
-            Featured on homepage
+            Featured on homepage (works for YouTube + uploaded videos)
           </label>
         </div>
 
@@ -421,6 +493,8 @@ export function VideosManager() {
                 className="btn-gradient-secondary text-sm"
                 onClick={() => {
                   setEditingId(video._id);
+                  const isYoutube = Boolean(extractYoutubeVideoId(video.youtubeVideoId || "") || extractYoutubeVideoId(video.videoUrl || ""));
+                  setSourceMode(isYoutube ? "youtube" : "file");
                   setForm({
                     title: video.title,
                     description: video.description || "",
@@ -428,7 +502,10 @@ export function VideosManager() {
                     videoKey: video.videoKey || "",
                     contentType: video.contentType || "video/mp4",
                     sizeBytes: video.sizeBytes || 0,
-                    youtubeVideoId: video.youtubeVideoId || "",
+                    youtubeVideoId:
+                      video.youtubeVideoId ||
+                      extractYoutubeVideoId(video.videoUrl || "") ||
+                      "",
                     published: video.published,
                     featured: Boolean(video.featured),
                     sortOrder: video.sortOrder || 0

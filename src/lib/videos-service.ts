@@ -2,6 +2,7 @@ import { connectMongo } from "@/lib/mongodb";
 import { normalizePublicImageUrl } from "@/lib/r2";
 import {
   DEFAULT_YOUTUBE_CHANNEL_CONFIG,
+  extractYoutubeVideoId,
   type YoutubeChannelConfig,
   youtubeEmbedUrlForChannel
 } from "@/lib/youtube";
@@ -28,12 +29,16 @@ function mapDoc(doc: {
   contentType?: string;
   featured?: boolean;
 }): PublicVideo {
+  const videoUrl = doc.videoUrl ? normalizePublicImageUrl(doc.videoUrl) : "";
+  const youtubeVideoId =
+    extractYoutubeVideoId(doc.youtubeVideoId || "") || extractYoutubeVideoId(videoUrl) || "";
+
   return {
     id: doc._id.toString(),
     title: doc.title,
     description: doc.description || "",
-    videoUrl: doc.videoUrl ? normalizePublicImageUrl(doc.videoUrl) : "",
-    youtubeVideoId: doc.youtubeVideoId || "",
+    videoUrl: youtubeVideoId ? "" : videoUrl,
+    youtubeVideoId,
     contentType: doc.contentType || "video/mp4",
     featured: Boolean(doc.featured)
   };

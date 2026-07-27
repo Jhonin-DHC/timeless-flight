@@ -13,19 +13,33 @@ export async function PUT(request: Request, { params }: RouteProps) {
     await connectMongo();
     const body = await request.json();
     const update: Record<string, unknown> = {};
+
     if (typeof body.title === "string") update.title = body.title.trim();
     if (typeof body.description === "string") update.description = body.description.trim();
-    if (typeof body.videoUrl === "string") update.videoUrl = body.videoUrl.trim();
     if (typeof body.videoKey === "string") update.videoKey = body.videoKey;
     if (typeof body.contentType === "string") update.contentType = body.contentType;
     if (typeof body.sizeBytes === "number") update.sizeBytes = body.sizeBytes;
-    if (typeof body.youtubeVideoId === "string") {
-      const parsed = extractYoutubeVideoId(body.youtubeVideoId.trim());
-      update.youtubeVideoId = parsed || body.youtubeVideoId.trim();
-    }
     if (typeof body.published === "boolean") update.published = body.published;
     if (typeof body.featured === "boolean") update.featured = body.featured;
     if (typeof body.sortOrder === "number") update.sortOrder = body.sortOrder;
+
+    const youtubeInput = typeof body.youtubeVideoId === "string" ? body.youtubeVideoId.trim() : "";
+    const rawVideoUrl = typeof body.videoUrl === "string" ? body.videoUrl.trim() : undefined;
+    const youtubeVideoId =
+      extractYoutubeVideoId(youtubeInput) ||
+      (rawVideoUrl ? extractYoutubeVideoId(rawVideoUrl) : null) ||
+      "";
+
+    if (youtubeVideoId) {
+      update.youtubeVideoId = youtubeVideoId;
+      update.videoUrl = "";
+      update.videoKey = "";
+      update.contentType = "video/youtube";
+      update.sizeBytes = 0;
+    } else {
+      if (typeof body.youtubeVideoId === "string") update.youtubeVideoId = "";
+      if (rawVideoUrl !== undefined) update.videoUrl = rawVideoUrl;
+    }
 
     const video = await VideoResource.findByIdAndUpdate(id, update, { new: true });
     if (!video) {

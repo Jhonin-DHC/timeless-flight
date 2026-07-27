@@ -1,5 +1,5 @@
 import { toDisplayMediaUrl } from "@/lib/r2-display";
-import { youtubeEmbedUrlForVideo } from "@/lib/youtube";
+import { extractYoutubeVideoId, youtubeEmbedUrlForVideo } from "@/lib/youtube";
 
 type VideoPlayerProps = {
   title: string;
@@ -8,12 +8,19 @@ type VideoPlayerProps = {
   className?: string;
 };
 
+/** Prefer explicit YouTube id, otherwise detect a YouTube URL in videoUrl. */
+export function resolveYoutubeVideoId(youtubeVideoId = "", videoUrl = "") {
+  return extractYoutubeVideoId(youtubeVideoId) || extractYoutubeVideoId(videoUrl) || "";
+}
+
 export function VideoPlayer({ title, videoUrl = "", youtubeVideoId = "", className }: VideoPlayerProps) {
-  if (youtubeVideoId) {
+  const ytId = resolveYoutubeVideoId(youtubeVideoId, videoUrl);
+
+  if (ytId) {
     return (
       <iframe
         title={title}
-        src={youtubeEmbedUrlForVideo(youtubeVideoId)}
+        src={youtubeEmbedUrlForVideo(ytId)}
         className={className ?? "aspect-video w-full rounded-xl bg-black"}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowFullScreen
@@ -25,7 +32,12 @@ export function VideoPlayer({ title, videoUrl = "", youtubeVideoId = "", classNa
 
   if (!videoUrl) {
     return (
-      <div className={className ?? "flex aspect-video w-full items-center justify-center rounded-xl bg-black/40 text-sm text-[var(--muted)]"}>
+      <div
+        className={
+          className ??
+          "flex aspect-video w-full items-center justify-center rounded-xl bg-black/40 text-sm text-[var(--muted)]"
+        }
+      >
         Video unavailable
       </div>
     );
@@ -43,7 +55,13 @@ export function VideoPlayer({ title, videoUrl = "", youtubeVideoId = "", classNa
   }
 
   return (
-    <video src={src} controls playsInline preload="metadata" className={className ?? "aspect-video w-full rounded-xl bg-black"}>
+    <video
+      src={src}
+      controls
+      playsInline
+      preload="metadata"
+      className={className ?? "aspect-video w-full rounded-xl bg-black"}
+    >
       <track kind="captions" />
     </video>
   );

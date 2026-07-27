@@ -25,15 +25,17 @@ export async function POST(request: Request) {
     await connectMongo();
     const body = await request.json();
     const title = typeof body.title === "string" ? body.title.trim() : "";
-    const videoUrl = typeof body.videoUrl === "string" ? body.videoUrl.trim() : "";
     const youtubeInput = typeof body.youtubeVideoId === "string" ? body.youtubeVideoId.trim() : "";
-    const youtubeVideoId = extractYoutubeVideoId(youtubeInput) || youtubeInput;
+    const rawVideoUrl = typeof body.videoUrl === "string" ? body.videoUrl.trim() : "";
+    const youtubeVideoId =
+      extractYoutubeVideoId(youtubeInput) || extractYoutubeVideoId(rawVideoUrl) || "";
+    const videoUrl = youtubeVideoId ? "" : rawVideoUrl;
 
     if (!title) {
       return NextResponse.json({ error: "Title is required." }, { status: 400 });
     }
     if (!videoUrl && !youtubeVideoId) {
-      return NextResponse.json({ error: "Upload a video file or paste a YouTube URL / video ID." }, { status: 400 });
+      return NextResponse.json({ error: "Paste a YouTube video URL or upload a video file." }, { status: 400 });
     }
 
     const video = await VideoResource.create({
@@ -41,9 +43,14 @@ export async function POST(request: Request) {
       description: typeof body.description === "string" ? body.description.trim() : "",
       videoUrl,
       videoKey: typeof body.videoKey === "string" ? body.videoKey : "",
-      contentType: typeof body.contentType === "string" ? body.contentType : "video/mp4",
+      contentType:
+        typeof body.contentType === "string"
+          ? body.contentType
+          : youtubeVideoId
+            ? "video/youtube"
+            : "video/mp4",
       sizeBytes: typeof body.sizeBytes === "number" ? body.sizeBytes : 0,
-      youtubeVideoId: youtubeVideoId || "",
+      youtubeVideoId,
       published: body.published !== false,
       featured: Boolean(body.featured),
       sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : 0
