@@ -56,6 +56,17 @@ interface WatchRow {
   lastSoldDate?: string;
   lastSoldSource?: string;
   lastSoldUrl?: string;
+  authorizedDealerPriceUsd?: number;
+  watchChartsEstimateUsd?: number;
+  recentSoldVariant?: string;
+  brandNewPremiumPct?: number;
+  withoutBoxPapersPct?: number;
+  marketVolatility?: number;
+  riskScore?: number;
+  riskScoreLabel?: string;
+  salesVolume1Y?: number;
+  medianDaysOnMarket?: number;
+  importSource?: string;
 }
 
 const emptyForm = {
@@ -86,7 +97,17 @@ const emptyForm = {
   lastSoldPriceUsd: "",
   lastSoldDate: "",
   lastSoldSource: "",
-  lastSoldUrl: ""
+  lastSoldUrl: "",
+  authorizedDealerPriceUsd: "",
+  watchChartsEstimateUsd: "",
+  recentSoldVariant: "",
+  brandNewPremiumPct: "",
+  withoutBoxPapersPct: "",
+  marketVolatility: "",
+  riskScore: "",
+  riskScoreLabel: "",
+  salesVolume1Y: "",
+  medianDaysOnMarket: ""
 };
 
 function money(value?: number) {
@@ -124,8 +145,23 @@ function toPayload(form: typeof emptyForm) {
     lastSoldPriceUsd: num(form.lastSoldPriceUsd),
     lastSoldDate: form.lastSoldDate || null,
     lastSoldSource: form.lastSoldSource,
-    lastSoldUrl: form.lastSoldUrl
+    lastSoldUrl: form.lastSoldUrl,
+    authorizedDealerPriceUsd: num(form.authorizedDealerPriceUsd),
+    watchChartsEstimateUsd: num(form.watchChartsEstimateUsd),
+    recentSoldVariant: form.recentSoldVariant,
+    brandNewPremiumPct: num(form.brandNewPremiumPct),
+    withoutBoxPapersPct: num(form.withoutBoxPapersPct),
+    marketVolatility: num(form.marketVolatility),
+    riskScore: num(form.riskScore),
+    riskScoreLabel: form.riskScoreLabel,
+    salesVolume1Y: num(form.salesVolume1Y),
+    medianDaysOnMarket: num(form.medianDaysOnMarket)
   };
+}
+
+function pct(value?: number) {
+  if (value == null || Number.isNaN(value)) return "—";
+  return `${(value * 100).toFixed(1)}%`;
 }
 
 function watchToForm(watch: WatchRow): typeof emptyForm {
@@ -157,7 +193,18 @@ function watchToForm(watch: WatchRow): typeof emptyForm {
     lastSoldPriceUsd: watch.lastSoldPriceUsd != null ? String(watch.lastSoldPriceUsd) : "",
     lastSoldDate: watch.lastSoldDate ? String(watch.lastSoldDate).slice(0, 10) : "",
     lastSoldSource: watch.lastSoldSource || "",
-    lastSoldUrl: watch.lastSoldUrl || ""
+    lastSoldUrl: watch.lastSoldUrl || "",
+    authorizedDealerPriceUsd:
+      watch.authorizedDealerPriceUsd != null ? String(watch.authorizedDealerPriceUsd) : "",
+    watchChartsEstimateUsd: watch.watchChartsEstimateUsd != null ? String(watch.watchChartsEstimateUsd) : "",
+    recentSoldVariant: watch.recentSoldVariant || "",
+    brandNewPremiumPct: watch.brandNewPremiumPct != null ? String(watch.brandNewPremiumPct) : "",
+    withoutBoxPapersPct: watch.withoutBoxPapersPct != null ? String(watch.withoutBoxPapersPct) : "",
+    marketVolatility: watch.marketVolatility != null ? String(watch.marketVolatility) : "",
+    riskScore: watch.riskScore != null ? String(watch.riskScore) : "",
+    riskScoreLabel: watch.riskScoreLabel || "",
+    salesVolume1Y: watch.salesVolume1Y != null ? String(watch.salesVolume1Y) : "",
+    medianDaysOnMarket: watch.medianDaysOnMarket != null ? String(watch.medianDaysOnMarket) : ""
   };
 }
 
@@ -327,6 +374,7 @@ export function WatchEvaluationsManager() {
               className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2"
             >
               <option value="manual">Manual</option>
+              <option value="import">Import</option>
               <option value="buy">Buy</option>
               <option value="trade-in">Trade-in</option>
               <option value="sell-inquiry">Sell inquiry</option>
@@ -393,8 +441,21 @@ export function WatchEvaluationsManager() {
           />
         </label>
 
-        <div className="rounded-xl border border-white/10 p-3">
-          <p className="mb-3 text-sm font-medium">Last sold (manual / future sold API)</p>
+        <div className="rounded-xl border border-white/10 p-3 space-y-4">
+          <p className="text-sm font-medium">Market database / WatchCharts</p>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {field("authorizedDealerPriceUsd", "Authorized dealer price (USD)", "number")}
+            {field("watchChartsEstimateUsd", "WatchCharts pre-owned estimate (USD)", "number")}
+            {field("recentSoldVariant", "Recent sold model / variant")}
+            {field("brandNewPremiumPct", "Brand-new premium (decimal, e.g. 0.103)", "number")}
+            {field("withoutBoxPapersPct", "Without box/papers impact (decimal)", "number")}
+            {field("marketVolatility", "Market volatility", "number")}
+            {field("riskScore", "Risk score (0–100)", "number")}
+            {field("riskScoreLabel", "Risk score label")}
+            {field("salesVolume1Y", "1Y sales volume", "number")}
+            {field("medianDaysOnMarket", "Median days on market", "number")}
+          </div>
+          <p className="text-sm font-medium">Last sold</p>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {field("lastSoldPriceUsd", "Last sold price (USD)", "number")}
             {field("lastSoldDate", "Last sold date", "date")}
@@ -432,9 +493,11 @@ export function WatchEvaluationsManager() {
                     {watch.condition ? ` · ${watch.condition}` : ""} · {watch.status}
                   </p>
                   <p className="mt-1 text-sm text-[var(--muted)]">
-                    Est. {money(watch.estimatedLowUsd)} – {money(watch.estimatedHighUsd)}
-                    {watch.estimatedMidUsd != null ? ` (mid ${money(watch.estimatedMidUsd)})` : ""}
-                    {watch.compsCount ? ` · ${watch.compsCount} comps` : ""}
+                    WatchCharts {money(watch.watchChartsEstimateUsd)}
+                    {watch.lastSoldPriceUsd != null ? ` · last sold ${money(watch.lastSoldPriceUsd)}` : ""}
+                    {watch.compsCount
+                      ? ` · eBay ${money(watch.estimatedLowUsd)}–${money(watch.estimatedHighUsd)}`
+                      : ""}
                   </p>
                 </button>
                 <div className="flex flex-wrap gap-2">
@@ -487,18 +550,27 @@ export function WatchEvaluationsManager() {
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 text-sm">
-                <p>Comps: {selected.compsCount ?? 0}</p>
-                <p>Min / Max: {money(selected.compsMinUsd)} / {money(selected.compsMaxUsd)}</p>
-                <p>Avg / Median: {money(selected.compsAvgUsd)} / {money(selected.compsMedianUsd)}</p>
-                <p>
-                  Est. range: {money(selected.estimatedLowUsd)} – {money(selected.estimatedHighUsd)}
-                </p>
-                <p>Your offer: {money(selected.offerPriceUsd)}</p>
-                <p>Target sell: {money(selected.targetSellPriceUsd)}</p>
+                <p>Dealer price: {money(selected.authorizedDealerPriceUsd)}</p>
+                <p>WatchCharts est.: {money(selected.watchChartsEstimateUsd)}</p>
                 <p>Last sold: {money(selected.lastSoldPriceUsd)}</p>
                 <p>
                   Last sold date:{" "}
                   {selected.lastSoldDate ? new Date(selected.lastSoldDate).toLocaleDateString() : "—"}
+                </p>
+                <p className="sm:col-span-2">Recent sold variant: {selected.recentSoldVariant || "—"}</p>
+                <p>Brand-new premium: {pct(selected.brandNewPremiumPct)}</p>
+                <p>W/o box & papers: {pct(selected.withoutBoxPapersPct)}</p>
+                <p>Volatility: {pct(selected.marketVolatility)}</p>
+                <p>Risk: {selected.riskScoreLabel || (selected.riskScore != null ? `${selected.riskScore}/100` : "—")}</p>
+                <p>1Y sales volume: {selected.salesVolume1Y ?? "—"}</p>
+                <p>Median days on market: {selected.medianDaysOnMarket ?? "—"}</p>
+                <p>Your offer: {money(selected.offerPriceUsd)}</p>
+                <p>Target sell: {money(selected.targetSellPriceUsd)}</p>
+                <p>eBay comps: {selected.compsCount ?? 0}</p>
+                <p>eBay min / max: {money(selected.compsMinUsd)} / {money(selected.compsMaxUsd)}</p>
+                <p>eBay avg / median: {money(selected.compsAvgUsd)} / {money(selected.compsMedianUsd)}</p>
+                <p>
+                  eBay est. range: {money(selected.estimatedLowUsd)} – {money(selected.estimatedHighUsd)}
                 </p>
               </div>
               <button

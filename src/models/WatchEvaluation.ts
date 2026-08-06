@@ -44,7 +44,7 @@ const WatchEvaluationSchema = new Schema(
     photoUrls: { type: [String], default: [] },
     source: {
       type: String,
-      enum: ["manual", "buy", "trade-in", "sell-inquiry", "consignment"],
+      enum: ["manual", "buy", "trade-in", "sell-inquiry", "consignment", "import"],
       default: "manual"
     },
     sellInquiryId: { type: String, default: "" },
@@ -70,11 +70,24 @@ const WatchEvaluationSchema = new Schema(
     estimatedHighUsd: { type: Number },
     estimatedMidUsd: { type: Number },
     comps: { type: [CompSnapshotSchema], default: [] },
-    // Sold comps — reserved until sold-data API access is available
+    // Sold comps
     lastSoldPriceUsd: { type: Number },
     lastSoldDate: { type: Date },
     lastSoldSource: { type: String, default: "" },
-    lastSoldUrl: { type: String, default: "" }
+    lastSoldUrl: { type: String, default: "" },
+    // Market database / WatchCharts columns
+    authorizedDealerPriceUsd: { type: Number },
+    watchChartsEstimateUsd: { type: Number },
+    recentSoldVariant: { type: String, default: "" },
+    brandNewPremiumPct: { type: Number },
+    withoutBoxPapersPct: { type: Number },
+    marketVolatility: { type: Number },
+    riskScore: { type: Number },
+    riskScoreLabel: { type: String, default: "" },
+    salesVolume1Y: { type: Number },
+    medianDaysOnMarket: { type: Number },
+    importSource: { type: String, default: "" },
+    externalKey: { type: String, default: "", index: true }
   },
   { timestamps: true }
 );
