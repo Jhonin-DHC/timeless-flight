@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ListingCard } from "@/components/listing-card";
 import { PortfolioCard } from "@/components/portfolio-card";
+import { TestimonialsSection } from "@/components/testimonials-section";
 import { VideoPlayer } from "@/components/video-player";
 import { getPublishedListings } from "@/lib/listings-service";
 import { getFeaturedVideos } from "@/lib/videos-service";
@@ -47,6 +48,8 @@ export default async function HomePage() {
           </Link>
         </div>
       </section>
+
+      <TestimonialsSection />
 
       <section className="space-y-5">
         <div className="flex items-end justify-between">
