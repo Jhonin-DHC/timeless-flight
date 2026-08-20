@@ -9,7 +9,8 @@
     "lint": "eslint",
     "seed": "node --env-file=.env.local scripts/seed.mjs",
     "search:ebay": "node --env-file=.env.local scripts/run-ebay-search.mjs",
-    "import:watches": "node --env-file=.env.local scripts/import-watch-database.mjs"
+    "import:watches": "node --env-file=.env.local scripts/import-watch-database.mjs",
+    "stripe:promos": "node --env-file=.env.local scripts/create-stripe-promo-codes.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1083.0",
@@ -21,6 +22,7 @@
     "nodemailer": "^9.0.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "stripe": "^22.5.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

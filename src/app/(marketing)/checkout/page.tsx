@@ -1,15 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useCart } from "@/components/cart-provider";
-import { createCheckout, validateCoupon } from "@/lib/storefront-api";
 
 interface AppliedCoupon {
   code: string;
   discountAmount: number;
+  percentOff?: number;
 }
 
-export default function CheckoutPage() {
+function CheckoutContent() {
+  const searchParams = useSearchParams();
   const { items, subtotal, updateQuantity, removeItem, clearCart } = useCart();
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -17,11 +19,18 @@ export default function CheckoutPage() {
   const [couponInput, setCouponInput] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const discount = appliedCoupon?.discountAmount ?? 0;
   const total = useMemo(() => Math.max(0, subtotal - discount), [subtotal, discount]);
+
+  useEffect(() => {
+    if (searchParams.get("canceled") === "1") {
+      setInfoMessage("Checkout canceled. Your cart is still here when you’re ready to continue.");
+    }
+  }, [searchParams]);
 
   const applyCoupon = async () => {
     setErrorMessage(null);
@@ -32,13 +41,23 @@ export default function CheckoutPage() {
 
     setIsApplyingCoupon(true);
     try {
-      const result = await validateCoupon({
-        code: couponInput.trim().toUpperCase(),
-        cartTotal: subtotal,
-        items: items.map((item) => ({ name: item.name, price: item.price, quantity: item.quantity })),
-        customerEmail: customerEmail || undefined
+      const response = await fetch("/api/checkout/coupon", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: couponInput.trim().toUpperCase(),
+          cartTotal: subtotal
+        })
       });
-      setAppliedCoupon({ code: result.code, discountAmount: result.discountAmount });
+      const result = await response.json();
+      if (!response.ok || !result.valid) {
+        throw new Error(result.error ?? "Failed to validate coupon.");
+      }
+      setAppliedCoupon({
+        code: result.code,
+        discountAmount: Number(result.discountAmount) || 0,
+        percentOff: typeof result.percentOff === "number" ? result.percentOff : undefined
+      });
       setCouponInput(result.code);
     } catch (error) {
       setAppliedCoupon(null);
@@ -54,8 +73,10 @@ export default function CheckoutPage() {
     setErrorMessage(null);
   };
 
-  const submitCheckout = async () => {
+  const submitCheckout = async (event?: FormEvent) => {
+    event?.preventDefault();
     setErrorMessage(null);
+    setInfoMessage(null);
     if (items.length === 0) {
       setErrorMessage("Your cart is empty.");
       return;
@@ -67,15 +88,23 @@ export default function CheckoutPage() {
 
     setIsSubmitting(true);
     try {
-      const paymentUrl = await createCheckout({
-        items,
-        customerEmail,
-        customerName,
-        couponCode: appliedCoupon?.code,
-        referralEmail: referralEmail || undefined
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items,
+          customerEmail,
+          customerName,
+          referralEmail: referralEmail || undefined,
+          couponCode: appliedCoupon?.code
+        })
       });
+      const payload = await response.json();
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.error ?? "Failed to start Stripe checkout.");
+      }
       clearCart();
-      window.location.assign(paymentUrl);
+      window.location.assign(payload.url as string);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Checkout failed.");
     } finally {
@@ -87,7 +116,8 @@ export default function CheckoutPage() {
     <section className="space-y-6">
       <h1 className="section-title">Checkout</h1>
       <p className="section-copy max-w-3xl">
-        Apply a coupon and continue to secure GHL payment. The backend is the source of truth for coupon validity and final totals.
+        Review your cart and continue to secure Stripe payment. Coupons are validated before payment; final totals are
+        confirmed by Stripe.
       </p>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
@@ -184,7 +214,9 @@ export default function CheckoutPage() {
               <span>${subtotal.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[var(--muted)]">Discount</span>
+              <span className="text-[var(--muted)]">
+                Discount{appliedCoupon?.percentOff ? ` (${appliedCoupon.percentOff}%)` : ""}
+              </span>
               <span>- ${discount.toLocaleString()}</span>
             </div>
             <div className="flex justify-between border-t border-white/15 pt-2 text-base font-semibold">
@@ -193,18 +225,34 @@ export default function CheckoutPage() {
             </div>
           </div>
 
+          {infoMessage ? <p className="text-sm text-[var(--brand-c)]">{infoMessage}</p> : null}
           {errorMessage ? <p className="text-sm text-red-300">{errorMessage}</p> : null}
 
           <button
             type="button"
-            onClick={submitCheckout}
+            onClick={() => void submitCheckout()}
             disabled={isSubmitting || items.length === 0}
             className="btn-gradient-primary w-full text-sm"
           >
-            {isSubmitting ? "Redirecting..." : "Proceed to payment"}
+            {isSubmitting ? "Redirecting to Stripe..." : "Pay securely with Stripe"}
           </button>
         </aside>
       </div>
     </section>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <section className="glass-panel space-y-4">
+          <h1 className="section-title">Checkout</h1>
+          <p className="section-copy">Loading cart…</p>
+        </section>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
   );
 }
