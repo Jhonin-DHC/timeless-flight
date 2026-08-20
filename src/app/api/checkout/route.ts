@@ -101,8 +101,9 @@ export async function POST(request: Request) {
       }
     }
 
-    const totalUsd = Math.max(0, subtotalUsd - discountUsd);
-    if (totalUsd < 0.5) {
+    const totalUsd = Math.max(0, Math.round((subtotalUsd - discountUsd) * 100) / 100);
+    // Stripe allows $0 when a 100% coupon applies; otherwise enforce the $0.50 floor.
+    if (totalUsd > 0 && totalUsd < 0.5) {
       return NextResponse.json({ error: "Order total must be at least $0.50 for Stripe Checkout." }, { status: 400 });
     }
 
