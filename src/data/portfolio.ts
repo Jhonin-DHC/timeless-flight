@@ -23,5 +23,11 @@ export const portfolioCategories: PortfolioCategory[] = [
     title: "Modern Tool",
     description: "Contemporary watchmaking with everyday durability.",
     highlights: ["Chronometer-grade calibers", "Water resistance focus", "Ceramic bezels", "Warranty-backed examples"]
+  },
+  {
+    slug: "vintage-watches",
+    title: "Vintage Watches",
+    description: "Character-rich pieces with provenance, patina, and lasting appeal.",
+    highlights: ["Pre-owned classics", "Period-correct dials", "Service history notes", "Collector-grade examples"]
   }
 ];

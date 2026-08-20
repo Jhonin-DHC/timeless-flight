@@ -49,8 +49,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <TestimonialsSection />
-
       <section className="space-y-5">
         <div className="flex items-end justify-between">
           <h2 className="section-title">Featured pieces</h2>
@@ -99,12 +97,14 @@ export default async function HomePage() {
 
       <section className="space-y-5">
         <h2 className="section-title">Portfolio categories</h2>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {portfolioCategories.map((category) => (
             <PortfolioCard key={category.slug} category={category} />
           ))}
         </div>
       </section>
+
+      <TestimonialsSection />
     </div>
   );
 }
