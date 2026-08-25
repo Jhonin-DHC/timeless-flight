@@ -10,6 +10,7 @@ const navItems = [
   { href: "/admin/videos", label: "Videos" },
   { href: "/admin/search", label: "Search" },
   { href: "/admin/sell-inquiries", label: "Sell inquiries" },
+  { href: "/admin/abandoned-carts", label: "Abandoned carts" },
   { href: "/admin/settings", label: "Settings" }
 ];
 

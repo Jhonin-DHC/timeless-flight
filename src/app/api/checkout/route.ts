@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectMongo } from "@/lib/mongodb";
 import { dollarsToCents, getSiteUrl, getStripe, isStripeConfigured } from "@/lib/stripe";
+import { AbandonedCart } from "@/models/AbandonedCart";
 import { Order } from "@/models/Order";
 import type Stripe from "stripe";
 
@@ -169,6 +170,22 @@ export async function POST(request: Request) {
       status: "pending",
       items: normalizedItems
     });
+
+    await AbandonedCart.findOneAndUpdate(
+      { email: customerEmail.trim().toLowerCase(), status: "open" },
+      {
+        $set: {
+          email: customerEmail.trim().toLowerCase(),
+          customerName,
+          items: normalizedItems,
+          subtotalUsd,
+          stripeSessionId: session.id,
+          lastActivityAt: new Date()
+        },
+        $setOnInsert: { status: "open" }
+      },
+      { upsert: true }
+    );
 
     return NextResponse.json({
       ok: true,

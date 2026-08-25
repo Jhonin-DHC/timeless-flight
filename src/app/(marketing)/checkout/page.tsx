@@ -32,6 +32,29 @@ function CheckoutContent() {
     }
   }, [searchParams]);
 
+  // Soft-capture abandoned carts: save when email looks valid (no verification).
+  useEffect(() => {
+    const email = customerEmail.trim().toLowerCase();
+    const looksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!looksValid || items.length === 0) return;
+
+    const timer = window.setTimeout(() => {
+      void fetch("/api/cart/abandon", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          customerName: customerName.trim(),
+          items
+        })
+      }).catch(() => {
+        // Non-blocking; checkout should still work if save fails.
+      });
+    }, 800);
+
+    return () => window.clearTimeout(timer);
+  }, [customerEmail, customerName, items]);
+
   const applyCoupon = async () => {
     setErrorMessage(null);
     if (!couponInput.trim()) {
@@ -172,6 +195,9 @@ function CheckoutContent() {
             type="email"
             className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm outline-none ring-[var(--brand-a)] focus:ring-2"
           />
+          <p className="text-xs text-[var(--muted)]">
+            Entering your email saves this cart so we can follow up if checkout is interrupted. No verification required.
+          </p>
           <input
             value={referralEmail}
             onChange={(event) => setReferralEmail(event.target.value)}

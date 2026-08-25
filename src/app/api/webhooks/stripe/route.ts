@@ -2,9 +2,30 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { connectMongo } from "@/lib/mongodb";
 import { getStripe } from "@/lib/stripe";
+import { AbandonedCart } from "@/models/AbandonedCart";
 import { Order } from "@/models/Order";
 
 export const runtime = "nodejs";
+
+async function markCartRecovered(email: string | null | undefined, stripeSessionId?: string) {
+  const normalized = typeof email === "string" ? email.trim().toLowerCase() : "";
+  const filter: Record<string, unknown> = { status: "open" };
+  if (normalized) {
+    filter.email = normalized;
+  } else if (stripeSessionId) {
+    filter.stripeSessionId = stripeSessionId;
+  } else {
+    return;
+  }
+
+  await AbandonedCart.findOneAndUpdate(filter, {
+    $set: {
+      status: "recovered",
+      recoveredAt: new Date(),
+      ...(stripeSessionId ? { stripeSessionId } : {})
+    }
+  });
+}
 
 export async function POST(request: Request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -37,6 +58,7 @@ export async function POST(request: Request) {
         typeof session.payment_intent === "string"
           ? session.payment_intent
           : session.payment_intent?.id || "";
+      const paidEmail = session.customer_details?.email || session.customer_email || session.metadata?.customerEmail;
 
       await Order.findOneAndUpdate(
         { stripeSessionId: session.id },
@@ -45,13 +67,15 @@ export async function POST(request: Request) {
             status: "paid",
             stripePaymentIntentId: paymentIntentId,
             paidAt: new Date(),
-            customerEmail: session.customer_details?.email || session.customer_email || undefined,
+            customerEmail: paidEmail || undefined,
             customerName: session.metadata?.customerName || undefined,
             totalUsd:
               typeof session.amount_total === "number" ? session.amount_total / 100 : undefined
           }
         }
       );
+
+      await markCartRecovered(paidEmail, session.id);
     }
 
     if (event.type === "checkout.session.expired") {
