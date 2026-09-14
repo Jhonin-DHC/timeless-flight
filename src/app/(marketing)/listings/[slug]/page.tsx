@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { ListingDescription } from "@/components/listing-description";
 import { ListingImageGallery } from "@/components/listing-image-gallery";
 import { ListingModalTrigger } from "@/components/listing-modal-trigger";
 import { getListingBySlug } from "@/lib/listings-service";
@@ -22,7 +23,7 @@ export default async function ListingDetailPage({ params }: ListingDetailProps) 
       <ListingImageGallery name={listing.name} imageUrl={listing.imageUrl} imageUrls={listing.imageUrls} />
       <div className="space-y-4">
         <h1 className="section-title">{listing.name}</h1>
-        <p className="section-copy">{listing.description}</p>
+        <ListingDescription text={listing.description} />
         <div className="flex flex-wrap gap-2 text-sm text-[var(--muted)]">
           <span className="glass-card !py-2">{listing.brand}</span>
           <span className="glass-card !py-2">{listing.condition}</span>

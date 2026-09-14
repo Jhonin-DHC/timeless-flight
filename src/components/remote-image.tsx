@@ -9,24 +9,25 @@ interface RemoteImageProps {
   className?: string;
   sizes?: string;
   onError?: () => void;
+  fill?: boolean;
 }
 
 /**
  * R2 images are loaded via same-origin /api/media proxy (no browser DNS for r2.dev needed).
  * Other remotes (e.g. Unsplash) use next/image.
  */
-export function RemoteImage({ src, alt, className, sizes = "256px", onError }: RemoteImageProps) {
+export function RemoteImage({ src, alt, className, sizes = "256px", onError, fill = true }: RemoteImageProps) {
   if (!src) return null;
 
   const displaySrc = toDisplayImageUrl(src);
 
-  if (displaySrc.startsWith("/api/media/")) {
+  if (!fill || displaySrc.startsWith("/api/media/")) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={displaySrc}
         alt={alt}
-        className={`absolute inset-0 h-full w-full ${className ?? ""}`}
+        className={fill ? `absolute inset-0 h-full w-full ${className ?? ""}` : className}
         onError={onError}
       />
     );
