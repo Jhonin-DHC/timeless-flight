@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCart } from "@/components/cart-provider";
+import { SITE_PHONE_DISPLAY, SITE_PHONE_HREF } from "@/lib/site";
 
 const links = [
   { href: "/", label: "Home" },
@@ -18,7 +19,14 @@ export function Header() {
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 bg-[#070b14]/85 backdrop-blur-xl">
       <div className="container-shell flex items-center justify-between py-4">
-        <Link href="/" className="text-lg font-semibold tracking-wide">The Aviators Watch</Link>
+        <div className="flex flex-col">
+          <Link href="/" className="text-lg font-semibold tracking-wide">
+            The Aviators Watch
+          </Link>
+          <a href={SITE_PHONE_HREF} className="text-sm text-[var(--muted)] hover:text-[var(--foreground)]">
+            {SITE_PHONE_DISPLAY}
+          </a>
+        </div>
         <nav className="flex flex-wrap items-center gap-2 text-sm md:gap-4">
           {links.map((link) => (
             <Link key={link.href} href={link.href} className="rounded-full px-3 py-1.5 hover:bg-white/10">

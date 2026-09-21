@@ -17,7 +17,7 @@ export default async function HomePage() {
       <section className="glass-panel space-y-5">
         <p className="text-sm uppercase tracking-[0.2em] text-[var(--brand-c)]">The Aviators Watch</p>
         <h1 className="max-w-4xl text-4xl font-semibold leading-tight md:text-6xl">
-          Turn Your Unused Watches Into Cash Today
+          Branded Watches
         </h1>
         <p className="max-w-3xl text-lg font-medium text-[var(--foreground)] md:text-xl">
           Running or not running, with or without papers — we&apos;ll take them all.

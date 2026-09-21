@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { RemoteImage } from "@/components/remote-image";
+import { SITE_PHONE_DISPLAY, SITE_PHONE_HREF } from "@/lib/site";
 
 type Step = "items" | "contact" | "review" | "done";
 
@@ -219,7 +220,11 @@ export function SellIntakeForm() {
               Continue
             </button>
             <p className="text-sm text-[var(--muted)]">
-              Need help?{" "}
+              Need help? Call{" "}
+              <a href={SITE_PHONE_HREF} className="text-[var(--brand-a)]">
+                {SITE_PHONE_DISPLAY}
+              </a>{" "}
+              or email{" "}
               <a href="mailto:concierge@listqik.com" className="text-[var(--brand-a)]">
                 concierge@listqik.com
               </a>
