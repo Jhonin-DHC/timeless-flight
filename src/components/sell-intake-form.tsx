@@ -138,10 +138,10 @@ export function SellIntakeForm() {
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="text-center">
-        <p className="text-sm uppercase tracking-[0.2em] text-[var(--brand-c)]">Sell your watch</p>
+        <p className="text-sm uppercase tracking-[0.2em] text-[var(--brand-c)]">Sell your branded watch</p>
         <p className="mt-2 text-sm text-[var(--muted)]">
           <Link href="/sell" className="text-[var(--brand-a)]">
-            We Buy Watches
+            We Buy Branded Watches
           </Link>{" "}
           · Watch Intake Form
         </p>

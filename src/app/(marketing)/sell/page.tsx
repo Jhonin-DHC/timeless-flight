@@ -43,8 +43,8 @@ export default function SellLandingPage() {
   return (
     <div className="space-y-10 md:space-y-14">
       <section className="glass-panel space-y-6">
-        <p className="text-sm uppercase tracking-[0.2em] text-[var(--brand-c)]">Sell Your Watch</p>
-        <h1 className="section-title max-w-4xl">Branded Watches</h1>
+        <p className="text-sm uppercase tracking-[0.2em] text-[var(--brand-c)]">Sell Your Branded Watch</p>
+        <h1 className="section-title max-w-4xl">Turn Your Unused Branded Watches Into Cash Today</h1>
         <p className="text-xl font-medium text-[var(--foreground)] md:text-2xl">
           Running or not running, with or without papers — we&apos;ll take them all.
         </p>
@@ -63,11 +63,11 @@ export default function SellLandingPage() {
           make the process simple, smart, and stress-free.
         </p>
         <p className="text-lg font-medium text-[var(--foreground)]">
-          We buy branded watches — Any Brand. Any Condition. Any Collection Size.
+          We Buy Branded Watches — Any Brand. Any Condition. Any Collection Size.
         </p>
         <div className="flex flex-wrap gap-3">
           <Link href="/sell/intake" className="btn-gradient-primary">
-            Sell Your Watch Today!
+            Sell Your Branded Watch Today!
           </Link>
           <Link href="/listings" className="btn-gradient-secondary">
             Browse current listings
@@ -76,7 +76,7 @@ export default function SellLandingPage() {
       </section>
 
       <section className="glass-panel space-y-4">
-        <h2 className="section-title">Have a watch you&apos;re thinking about selling?</h2>
+        <h2 className="section-title">Have a branded watch you&apos;re thinking about selling?</h2>
         <p className="section-copy max-w-3xl">
           Whether it&apos;s a single family heirloom, a luxury timepiece, a vintage find, or an entire watch
           collection, we&apos;d love the opportunity to make you a fair offer.
@@ -84,7 +84,7 @@ export default function SellLandingPage() {
       </section>
 
       <section className="space-y-5">
-        <h2 className="section-title">We purchase</h2>
+        <h2 className="section-title">We purchase branded watches</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {wePurchase.map((item) => (
             <div key={item} className="glass-card text-sm">

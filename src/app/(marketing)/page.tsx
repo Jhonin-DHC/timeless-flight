@@ -17,7 +17,7 @@ export default async function HomePage() {
       <section className="glass-panel space-y-5">
         <p className="text-sm uppercase tracking-[0.2em] text-[var(--brand-c)]">The Aviators Watch</p>
         <h1 className="max-w-4xl text-4xl font-semibold leading-tight md:text-6xl">
-          Branded Watches
+          Turn Your Unused Branded Watches Into Cash Today
         </h1>
         <p className="max-w-3xl text-lg font-medium text-[var(--foreground)] md:text-xl">
           Running or not running, with or without papers — we&apos;ll take them all.
@@ -38,10 +38,10 @@ export default async function HomePage() {
         </p>
         <div className="mt-2 flex flex-wrap gap-3">
           <Link href="/sell/intake" className="btn-gradient-primary">
-            Sell Your Watch Today!
+            Sell Your Branded Watch Today!
           </Link>
           <Link href="/sell" className="btn-gradient-secondary">
-            Learn more — We Buy Watches
+            Learn more — We Buy Branded Watches
           </Link>
           <Link href="/listings" className="btn-gradient-secondary">
             Shop listings

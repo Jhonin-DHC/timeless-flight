@@ -17,7 +17,7 @@ export default function AboutPage() {
         </Link>{" "}
         to shop available pieces, or{" "}
         <Link href="/sell" className="font-semibold text-[var(--brand-a)]">
-          sell your watch
+          sell your branded watch
         </Link>{" "}
         if you have one you no longer wear. We buy running and not running, with or without papers,
         and we also take trades and exchanges.
