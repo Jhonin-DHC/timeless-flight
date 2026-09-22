@@ -54,3 +54,7 @@ export function formatListingPrice(listing: Pick<ShopListing, "callForPricing" |
   if (isCallForPricing(listing)) return "Call for Pricing";
   return `$${listing.priceUsd.toLocaleString()}`;
 }
+
+export function canAddToCart(listing: Pick<ShopListing, "inStock" | "callForPricing" | "priceUsd">) {
+  return listing.inStock === true && listing.priceUsd > 0 && !isCallForPricing(listing);
+}

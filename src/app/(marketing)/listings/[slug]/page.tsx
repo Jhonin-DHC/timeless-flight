@@ -22,7 +22,7 @@ export default async function ListingDetailPage({ params }: ListingDetailProps) 
   }
 
   const section = listingSection(listing);
-  const available = listing.inStock !== false;
+  const inStock = listing.inStock === true;
 
   return (
     <article className="glass-panel space-y-6">
@@ -31,7 +31,7 @@ export default async function ListingDetailPage({ params }: ListingDetailProps) 
         <p className="text-sm uppercase tracking-[0.18em] text-[var(--brand-c)]">{listing.brand}</p>
         <h1 className="section-title">{listing.name}</h1>
         <p className="text-2xl font-semibold">{formatListingPrice(listing)}</p>
-        <p className={`text-sm font-medium ${available ? "text-[var(--brand-c)]" : "text-amber-200"}`}>
+        <p className={`text-sm font-medium ${inStock ? "text-[var(--brand-c)]" : "text-amber-200"}`}>
           {stockLabel(listing)}
         </p>
         {isCallForPricing(listing) ? (

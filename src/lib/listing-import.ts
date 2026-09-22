@@ -1,7 +1,7 @@
 import { breitlingCatalog } from "@/data/breitling-catalog";
 import { LISTING_CATEGORIES, LISTING_CONDITIONS, PLACEHOLDER_IMAGE, type ListingCategory, type ListingCondition } from "@/lib/listing-types";
 import { Listing } from "@/models/Listing";
-import XLSX from "xlsx";
+import * as XLSX from "xlsx";
 
 export function slugify(value: string) {
   return value

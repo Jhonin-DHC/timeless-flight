@@ -1,6 +1,7 @@
 "use client";
 
 import { Listing } from "@/data/listings";
+import { canAddToCart, type ShopListing } from "@/lib/listing-types";
 import { createContext, ReactNode, useContext, useMemo, useState } from "react";
 
 export interface CartItem {
@@ -15,7 +16,7 @@ interface CartContextValue {
   items: CartItem[];
   itemCount: number;
   subtotal: number;
-  addItem: (listing: Listing) => void;
+  addItem: (listing: Listing | ShopListing) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
@@ -26,7 +27,14 @@ const CartContext = createContext<CartContextValue | null>(null);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
 
-  const addItem = (listing: Listing) => {
+  const addItem = (listing: Listing | ShopListing) => {
+    if (!canAddToCart({
+      inStock: listing.inStock === true,
+      priceUsd: listing.priceUsd,
+      callForPricing: "callForPricing" in listing ? listing.callForPricing : listing.priceUsd <= 0
+    })) {
+      return;
+    }
     const productId = listing.storefrontProductId || listing.slug || listing.id;
     setItems((previous) => {
       const existing = previous.find((item) => item.productId === productId);

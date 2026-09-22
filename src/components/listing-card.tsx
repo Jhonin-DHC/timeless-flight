@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCart } from "@/components/cart-provider";
 import { RemoteImage } from "@/components/remote-image";
-import { listingSection, formatListingPrice, isCallForPricing, stockLabel, type ShopListing } from "@/lib/listing-types";
+import { listingSection, canAddToCart, formatListingPrice, isCallForPricing, stockLabel, type ShopListing } from "@/lib/listing-types";
 import { SITE_PHONE_HREF } from "@/lib/site";
 
 interface ListingCardProps {
@@ -14,7 +14,8 @@ interface ListingCardProps {
 export function ListingCard({ listing, compact = false }: ListingCardProps) {
   const { addItem } = useCart();
   const section = listingSection(listing);
-  const available = listing.inStock !== false;
+  const inStock = listing.inStock === true;
+  const available = canAddToCart(listing);
 
   return (
     <article className="glass-card overflow-hidden p-0">
@@ -27,7 +28,7 @@ export function ListingCard({ listing, compact = false }: ListingCardProps) {
             sizes="(max-width: 768px) 50vw, 25vw"
           />
           <div className="absolute left-2 top-2 flex flex-col gap-1">
-            {!available ? (
+            {!inStock ? (
               <span className="rounded-full bg-black/75 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-200">
                 Not in stock
               </span>
@@ -67,7 +68,7 @@ export function ListingCard({ listing, compact = false }: ListingCardProps) {
           </p>
         )}
         <p className="text-base font-semibold">{formatListingPrice(listing)}</p>
-        {!available ? <p className="text-[11px] leading-snug text-amber-200/90">{stockLabel(listing)}</p> : null}
+        {!inStock ? <p className="text-[11px] leading-snug text-amber-200/90">{stockLabel(listing)}</p> : null}
         <div className="flex flex-wrap gap-2 pt-1">
           <Link href={`/listings/${listing.slug}`} className="btn-gradient-secondary inline-block !px-3 !py-1.5 text-xs">
             View
