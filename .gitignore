@@ -13,3 +13,5 @@ env.local
 .env.test.local
 stripe-promo-codes.local.json
 stripe-promo-codes.local.txt
+tmp-docx/
+public/public/

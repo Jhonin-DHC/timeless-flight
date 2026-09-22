@@ -10,6 +10,8 @@
     "seed": "node --env-file=.env.local scripts/seed.mjs",
     "search:ebay": "node --env-file=.env.local scripts/run-ebay-search.mjs",
     "import:watches": "node --env-file=.env.local scripts/import-watch-database.mjs",
+    "import:listings": "node --env-file=.env.local scripts/import-listings-catalog.mjs",
+    "import:limited": "node --env-file=.env.local scripts/import-limited-editions.mjs",
     "stripe:promos": "node --env-file=.env.local scripts/create-stripe-promo-codes.mjs"
   },
   "dependencies": {

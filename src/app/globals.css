@@ -25,7 +25,7 @@ body {
 }
 
 .container-shell {
-  width: min(1100px, 92vw);
+  width: min(1240px, 94vw);
   margin-inline: auto;
 }
 

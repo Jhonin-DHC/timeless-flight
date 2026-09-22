@@ -20,8 +20,9 @@ export function RemoteImage({ src, alt, className, sizes = "256px", onError, fil
   if (!src) return null;
 
   const displaySrc = toDisplayImageUrl(src);
+  const isLocal = displaySrc.startsWith("/");
 
-  if (!fill || displaySrc.startsWith("/api/media/")) {
+  if (!fill || isLocal || displaySrc.startsWith("/api/media/")) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img

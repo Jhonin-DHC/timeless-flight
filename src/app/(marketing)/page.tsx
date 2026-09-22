@@ -44,21 +44,48 @@ export default async function HomePage() {
             Learn more — We Buy Branded Watches
           </Link>
           <Link href="/listings" className="btn-gradient-secondary">
-            Shop listings
+            Shop watches
           </Link>
         </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Link href="/listings" className="glass-card space-y-2">
+          <p className="text-xs uppercase tracking-[0.18em] text-[var(--brand-c)]">Catalog</p>
+          <h2 className="text-xl font-semibold">All watches</h2>
+          <p className="text-sm text-[var(--muted)]">
+            {listings.length} pieces — filter by brand, collection, price, and availability.
+          </p>
+        </Link>
+        <Link href="/limited-editions" className="glass-card space-y-2">
+          <p className="text-xs uppercase tracking-[0.18em] text-[var(--brand-c)]">Collector pieces</p>
+          <h2 className="text-xl font-semibold">Limited editions</h2>
+          <p className="text-sm text-[var(--muted)]">
+            Numbered and scarce Breitlings, including Navitimer limited editions.
+          </p>
+        </Link>
+        <Link href="/vintage" className="glass-card space-y-2">
+          <p className="text-xs uppercase tracking-[0.18em] text-[var(--brand-c)]">20+ years</p>
+          <h2 className="text-xl font-semibold">Vintage watches</h2>
+          <p className="text-sm text-[var(--muted)]">Older references with character, patina, and history.</p>
+        </Link>
+        <Link href="/project-watches" className="glass-card space-y-2">
+          <p className="text-xs uppercase tracking-[0.18em] text-[var(--brand-c)]">Needs work</p>
+          <h2 className="text-xl font-semibold">Project watches</h2>
+          <p className="text-sm text-[var(--muted)]">Restoration, repair, and as-is project pieces.</p>
+        </Link>
       </section>
 
       <section className="space-y-5">
         <div className="flex items-end justify-between">
           <h2 className="section-title">Featured pieces</h2>
           <Link href="/listings" className="text-sm text-[var(--brand-a)]">
-            View all listings
+            View all watches
           </Link>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {listings.slice(0, 3).map((listing) => (
-            <ListingCard key={listing.id} listing={listing} />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {listings.slice(0, 8).map((listing) => (
+            <ListingCard key={listing.id} listing={listing} compact />
           ))}
         </div>
       </section>

@@ -7,6 +7,10 @@ export function Footer() {
         <p>© {new Date().getFullYear()} The Aviators Watch</p>
         <div className="flex flex-wrap gap-4">
           <a href={SITE_PHONE_HREF}>{SITE_PHONE_DISPLAY}</a>
+          <a href="/listings">Watches</a>
+          <a href="/limited-editions">Limited Editions</a>
+          <a href="/vintage">Vintage</a>
+          <a href="/project-watches">Project Watches</a>
           <a href="/sell">Sell Your Branded Watch</a>
           <a href="/sell/intake">Watch Intake Form</a>
         </div>

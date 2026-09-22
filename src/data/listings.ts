@@ -1,16 +1,23 @@
+import type { ListingCondition, ListingCategory } from "@/lib/listing-types";
+
 export interface Listing {
   id: string;
   storefrontProductId?: string;
   slug: string;
   name: string;
   brand: string;
-  condition: "New" | "Excellent" | "Very Good";
+  referenceNumber?: string;
+  collection?: string;
+  condition: ListingCondition;
   year: number;
   priceUsd: number;
   imageUrl: string;
   /** Additional images after the main thumbnail (`imageUrl`). */
   imageUrls?: string[];
   description: string;
+  category?: ListingCategory;
+  inStock?: boolean;
+  availabilityNote?: string;
 }
 
 export const listings: Listing[] = [
@@ -72,7 +79,9 @@ export const listings: Listing[] = [
     year: 1992,
     priceUsd: 4950,
     imageUrl: "https://images.unsplash.com/photo-1508057198894-247b23fe5ade",
-    description: "A compact 30mm-33mm Mini-Navitimer with beaded bezel and fully functional slide rule."
+    description: "A compact 30mm-33mm Mini-Navitimer with beaded bezel and fully functional slide rule.",
+    category: "vintage",
+    inStock: true
   },
   {
     id: "lst_6",

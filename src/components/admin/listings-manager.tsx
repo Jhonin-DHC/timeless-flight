@@ -8,26 +8,36 @@ interface ListingRow {
   slug: string;
   name: string;
   brand: string;
-  condition: "New" | "Excellent" | "Very Good";
+  referenceNumber: string;
+  collection: string;
+  condition: "New" | "Excellent" | "Very Good" | "Good" | "Fair";
   year: number;
   priceUsd: number;
   imageUrl: string;
   imageUrls: string[];
   description: string;
   published: boolean;
+  category: "shop" | "vintage" | "project";
+  inStock: boolean;
+  availabilityNote: string;
 }
 
 const emptyForm: Omit<ListingRow, "_id"> = {
   slug: "",
   name: "",
   brand: "",
+  referenceNumber: "",
+  collection: "",
   condition: "Excellent",
   year: new Date().getFullYear(),
   priceUsd: 0,
   imageUrl: "",
   imageUrls: [],
   description: "",
-  published: true
+  published: true,
+  category: "shop",
+  inStock: true,
+  availabilityNote: ""
 };
 
 function slugify(value: string) {
@@ -45,6 +55,8 @@ export function ListingsManager() {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
 
   const load = async () => {
     const response = await fetch("/api/admin/listings");
@@ -56,7 +68,12 @@ export function ListingsManager() {
     setListings(
       (payload.listings ?? []).map((listing: ListingRow & { imageUrls?: string[] }) => ({
         ...listing,
-        imageUrls: Array.isArray(listing.imageUrls) ? listing.imageUrls : []
+        imageUrls: Array.isArray(listing.imageUrls) ? listing.imageUrls : [],
+        referenceNumber: listing.referenceNumber || "",
+        collection: listing.collection || "",
+        category: listing.category || "shop",
+        inStock: listing.inStock !== false,
+        availabilityNote: listing.availabilityNote || ""
       }))
     );
   };
@@ -150,12 +167,44 @@ export function ListingsManager() {
     });
   };
 
+  const importCatalog = async () => {
+    setImporting(true);
+    setImportMessage(null);
+    setError(null);
+    const response = await fetch("/api/admin/listings/import-catalog", { method: "POST" });
+    const payload = await response.json();
+    setImporting(false);
+    if (!response.ok) {
+      setError(payload.error ?? "Catalog import failed.");
+      return;
+    }
+    setImportMessage(`Imported ${payload.created} Breitling watches (${payload.skipped} already on the site).`);
+    await load();
+  };
+
+  const importFile = async (file: File) => {
+    setImporting(true);
+    setImportMessage(null);
+    setError(null);
+    const body = new FormData();
+    body.append("file", file);
+    const response = await fetch("/api/admin/listings/import", { method: "POST", body });
+    const payload = await response.json();
+    setImporting(false);
+    if (!response.ok) {
+      setError(payload.error ?? "File import failed.");
+      return;
+    }
+    setImportMessage(`Imported ${payload.created} listings from file (${payload.skipped} skipped).`);
+    await load();
+  };
+
   const save = async () => {
     setSaving(true);
     setError(null);
 
-    if (!form.name || !form.slug || !form.brand || !form.imageUrl) {
-      setError("Name, slug, brand, and at least one image (main/thumbnail) are required.");
+    if (!form.name || !form.slug || !form.brand) {
+      setError("Name, slug, and brand are required.");
       setSaving(false);
       return;
     }
@@ -166,6 +215,7 @@ export function ListingsManager() {
       body: JSON.stringify({
         ...form,
         storefrontProductId: form.slug,
+        imageUrl: form.imageUrl || "/images/watch-placeholder.svg",
         imageUrls: form.imageUrls.filter((url) => url && url !== form.imageUrl)
       })
     });
@@ -199,7 +249,38 @@ export function ListingsManager() {
     <div className="space-y-6">
       <div>
         <h2 className="section-title">Listings</h2>
-        <p className="section-copy">Upload watch images to R2 and publish listings to the storefront.</p>
+        <p className="section-copy">
+          Publish watches to the catalog, including out-of-stock pre-order pieces, vintage, and project watches.
+        </p>
+      </div>
+
+      <div className="glass-card space-y-3">
+        <p className="text-sm font-medium">Bulk upload</p>
+        <p className="text-xs text-[var(--muted)]">
+          Import the 79-watch Breitling catalog, or upload CSV/Excel with columns such as name/model, brand,
+          reference number, price, year, category (shop/vintage/project), and inStock. Existing slugs are skipped.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" className="btn-gradient-primary text-sm" disabled={importing} onClick={() => void importCatalog()}>
+            {importing ? "Importing..." : "Import Breitling catalog"}
+          </button>
+          <label className="btn-gradient-secondary cursor-pointer text-sm">
+            Upload CSV / Excel
+            <input
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  void importFile(file);
+                  event.target.value = "";
+                }
+              }}
+            />
+          </label>
+        </div>
+        {importMessage ? <p className="text-sm text-[var(--brand-c)]">{importMessage}</p> : null}
       </div>
 
       <div className="glass-card space-y-4">
@@ -229,6 +310,18 @@ export function ListingsManager() {
             placeholder="Brand"
             className="rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm"
           />
+          <input
+            value={form.referenceNumber}
+            onChange={(event) => setForm({ ...form, referenceNumber: event.target.value })}
+            placeholder="Reference number"
+            className="rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm"
+          />
+          <input
+            value={form.collection}
+            onChange={(event) => setForm({ ...form, collection: event.target.value })}
+            placeholder="Collection (Navitimer, Chronomat…)"
+            className="rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm"
+          />
           <select
             value={form.condition}
             onChange={(event) => setForm({ ...form, condition: event.target.value as ListingRow["condition"] })}
@@ -237,6 +330,17 @@ export function ListingsManager() {
             <option value="New">New</option>
             <option value="Excellent">Excellent</option>
             <option value="Very Good">Very Good</option>
+            <option value="Good">Good</option>
+            <option value="Fair">Fair</option>
+          </select>
+          <select
+            value={form.category}
+            onChange={(event) => setForm({ ...form, category: event.target.value as ListingRow["category"] })}
+            className="rounded-xl border border-white/15 bg-[#111a30] px-3 py-2 text-sm"
+          >
+            <option value="shop">Shop</option>
+            <option value="vintage">Vintage (20+ years)</option>
+            <option value="project">Project watch</option>
           </select>
           <input
             type="number"
@@ -260,6 +364,30 @@ export function ListingsManager() {
             />
             Published
           </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.inStock}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  inStock: event.target.checked,
+                  availabilityNote: event.target.checked
+                    ? ""
+                    : form.availabilityNote || "Not in Stock — Estimated Delivery 3–4 Weeks"
+                })
+              }
+            />
+            In stock
+          </label>
+          {form.inStock ? null : (
+            <input
+              value={form.availabilityNote}
+              onChange={(event) => setForm({ ...form, availabilityNote: event.target.value })}
+              placeholder="Not in Stock — Estimated Delivery 3–4 Weeks"
+              className="rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm md:col-span-2"
+            />
+          )}
         </div>
 
         <textarea
@@ -352,6 +480,8 @@ export function ListingsManager() {
               <p className="font-medium">{listing.name}</p>
               <p className="text-sm text-[var(--muted)]">
                 {listing.brand} • ${listing.priceUsd.toLocaleString()} • {listing.published ? "Published" : "Draft"}
+                {listing.inStock ? " • In stock" : " • Pre-order"}
+                {listing.category !== "shop" ? ` • ${listing.category}` : ""}
                 {(listing.imageUrls?.length ?? 0) > 0 ? ` • ${1 + listing.imageUrls.length} images` : ""}
               </p>
               <p className="text-xs text-[var(--muted)]">/{listing.slug}</p>
@@ -366,13 +496,18 @@ export function ListingsManager() {
                     slug: listing.slug,
                     name: listing.name,
                     brand: listing.brand,
+                    referenceNumber: listing.referenceNumber || "",
+                    collection: listing.collection || "",
                     condition: listing.condition,
                     year: listing.year,
                     priceUsd: listing.priceUsd,
                     imageUrl: listing.imageUrl,
                     imageUrls: Array.isArray(listing.imageUrls) ? listing.imageUrls : [],
                     description: listing.description,
-                    published: listing.published
+                    published: listing.published,
+                    category: listing.category || "shop",
+                    inStock: listing.inStock !== false,
+                    availabilityNote: listing.availabilityNote || ""
                   });
                 }}
               >

@@ -7,7 +7,10 @@ import { SITE_PHONE_DISPLAY, SITE_PHONE_HREF } from "@/lib/site";
 const links = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About" },
-  { href: "/listings", label: "Listings" },
+  { href: "/listings", label: "Watches" },
+  { href: "/limited-editions", label: "Limited Editions" },
+  { href: "/vintage", label: "Vintage" },
+  { href: "/project-watches", label: "Project Watches" },
   { href: "/sell", label: "Sell Your Branded Watch" },
   { href: "/portfolio", label: "Portfolio" },
   { href: "/resources", label: "Resources" }
