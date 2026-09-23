@@ -26,9 +26,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "A photo file is required." }, { status: 400 });
     }
 
-    const named = file as File;
-    const filename = named.name || "watch.jpg";
-    if (!isAllowedListingImage({ name: filename, type: named.type })) {
+    const filename = file.name || "watch.jpg";
+    if (!isAllowedListingImage({ name: filename, type: file.type })) {
       return NextResponse.json({ error: "Only JPEG, PNG, WebP, and GIF images are allowed." }, { status: 400 });
     }
 
@@ -36,7 +35,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Image must be 12MB or smaller." }, { status: 400 });
     }
 
-    const contentType = guessImageContentType({ name: filename, type: named.type });
+    const contentType = guessImageContentType({ name: filename, type: file.type });
     const uploadFile = new File([await file.arrayBuffer()], filename, { type: contentType });
 
     const uploaded = await uploadListingImage(uploadFile);

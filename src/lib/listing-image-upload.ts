@@ -7,7 +7,7 @@ const ALLOWED_TYPES = new Set([
   "image/gif"
 ]);
 
-export function isUploadFile(value: FormDataEntryValue | null): value is Blob & { name?: string; type: string; size: number } {
+export function isUploadFile(value: FormDataEntryValue | null): value is File {
   return Boolean(
     value &&
       typeof value === "object" &&
