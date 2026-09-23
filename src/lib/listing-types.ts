@@ -1,4 +1,9 @@
 export const PLACEHOLDER_IMAGE = "/images/watch-placeholder.svg";
+
+export function isPlaceholderImage(url?: string) {
+  if (!url) return true;
+  return /watch-placeholder|placeholder-watch/i.test(url);
+}
 export const OUT_OF_STOCK_NOTE = "Not in Stock — Estimated Delivery 3–4 Weeks";
 export const VINTAGE_AGE_YEARS = 20;
 

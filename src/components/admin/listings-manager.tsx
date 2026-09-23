@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { RemoteImage } from "@/components/remote-image";
+import { prepareListingImage } from "@/lib/listing-image-upload";
+import { PLACEHOLDER_IMAGE, isPlaceholderImage } from "@/lib/listing-types";
 
 interface ListingRow {
   _id: string;
@@ -53,6 +55,7 @@ export function ListingsManager() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -82,59 +85,94 @@ export function ListingsManager() {
     void load();
   }, []);
 
-  const uploadFiles = async (files: FileList | File[]) => {
+  const uploadFiles = async (files: FileList | File[], role: "main" | "gallery" = "gallery") => {
     const fileArray = Array.from(files);
     if (fileArray.length === 0) return;
 
     setUploading(true);
     setError(null);
+    setUploadError(null);
 
     const uploadedUrls: string[] = [];
     const failures: string[] = [];
-    for (const file of fileArray) {
-      try {
-        const body = new FormData();
-        body.append("file", file);
-        const response = await fetch("/api/admin/uploads", {
-          method: "POST",
-          body
-        });
-        const payload = await response.json();
-        if (!response.ok || !payload.url) {
-          failures.push(`${file.name}: ${payload.error ?? "Upload failed."}`);
-          continue;
+    try {
+      for (const original of fileArray) {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), 90_000);
+        try {
+          const file = await prepareListingImage(original);
+          const body = new FormData();
+          body.append("file", file);
+          const response = await fetch("/api/admin/uploads", {
+            method: "POST",
+            body,
+            signal: controller.signal
+          });
+          const raw = await response.text();
+          let payload: { url?: string; error?: string } = {};
+          try {
+            payload = raw ? (JSON.parse(raw) as { url?: string; error?: string }) : {};
+          } catch {
+            failures.push(`${original.name}: Upload failed (${response.status}).`);
+            continue;
+          }
+          if (!response.ok || !payload.url) {
+            failures.push(`${original.name}: ${payload.error ?? "Upload failed."}`);
+            continue;
+          }
+          uploadedUrls.push(payload.url);
+        } catch (error) {
+          const aborted = error instanceof DOMException && error.name === "AbortError";
+          failures.push(
+            `${original.name}: ${
+              aborted
+                ? "Upload timed out. Try a smaller JPEG or PNG."
+                : error instanceof Error
+                  ? error.message
+                  : "Network error while uploading."
+            }`
+          );
+        } finally {
+          window.clearTimeout(timeout);
         }
-        uploadedUrls.push(payload.url as string);
-      } catch {
-        failures.push(`${file.name}: Network error while uploading.`);
       }
-    }
 
-    if (uploadedUrls.length > 0) {
-      setForm((current) => {
-        const nextUrls = [...uploadedUrls];
-        if (!current.imageUrl && nextUrls.length > 0) {
-          const [main, ...rest] = nextUrls;
+      if (uploadedUrls.length > 0) {
+        setForm((current) => {
+          const replaceMain = role === "main" || isPlaceholderImage(current.imageUrl);
+          if (!replaceMain) {
+            return {
+              ...current,
+              imageUrls: [...current.imageUrls, ...uploadedUrls].filter((url) => url !== current.imageUrl)
+            };
+          }
+          const [main, ...rest] = uploadedUrls;
+          const extras = [
+            ...(!isPlaceholderImage(current.imageUrl) && current.imageUrl && current.imageUrl !== main
+              ? [current.imageUrl]
+              : []),
+            ...current.imageUrls,
+            ...rest
+          ].filter((url) => url && url !== main);
           return {
             ...current,
             imageUrl: main,
-            imageUrls: [...current.imageUrls, ...rest]
+            imageUrls: [...new Set(extras)]
           };
-        }
-        return {
-          ...current,
-          imageUrls: [...current.imageUrls, ...nextUrls]
-        };
-      });
+        });
+      }
+    } finally {
+      setUploading(false);
     }
 
-    setUploading(false);
     if (failures.length > 0) {
       const prefix =
         uploadedUrls.length > 0
           ? `${uploadedUrls.length} uploaded. Some failed: `
           : "Image upload failed: ";
-      setError(`${prefix}${failures.join(" ")}`);
+      const message = `${prefix}${failures.join(" ")}`;
+      setUploadError(message);
+      setError(message);
     }
   };
 
@@ -202,6 +240,7 @@ export function ListingsManager() {
   const save = async () => {
     setSaving(true);
     setError(null);
+    setUploadError(null);
 
     if (!form.name || !form.slug || !form.brand) {
       setError("Name, slug, and brand are required.");
@@ -215,8 +254,8 @@ export function ListingsManager() {
       body: JSON.stringify({
         ...form,
         storefrontProductId: form.slug,
-        imageUrl: form.imageUrl || "/images/watch-placeholder.svg",
-        imageUrls: form.imageUrls.filter((url) => url && url !== form.imageUrl)
+        imageUrl: form.imageUrl || PLACEHOLDER_IMAGE,
+        imageUrls: form.imageUrls.filter((url) => url && url !== form.imageUrl && !isPlaceholderImage(url))
       })
     });
     const payload = await response.json();
@@ -229,6 +268,7 @@ export function ListingsManager() {
 
     setForm(emptyForm);
     setEditingId(null);
+    setUploadError(null);
     await load();
   };
 
@@ -241,6 +281,7 @@ export function ListingsManager() {
     setForm(emptyForm);
     setEditingId(null);
     setError(null);
+    setUploadError(null);
   };
 
   const allImages = form.imageUrl ? [form.imageUrl, ...form.imageUrls] : [...form.imageUrls];
@@ -401,24 +442,47 @@ export function ListingsManager() {
         <div className="rounded-xl border border-white/15 p-4">
           <p className="text-sm font-medium">Watch images</p>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            First image becomes the main thumbnail. Additional images appear in the listing gallery.
+            Use Main / thumbnail to replace the listing photo. Additional images appear in the gallery.
           </p>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              multiple
-              onChange={(event) => {
-                const files = event.target.files;
-                if (files?.length) {
-                  void uploadFiles(files);
-                  event.target.value = "";
-                }
-              }}
-              className="text-sm"
-            />
-            <span className="text-xs text-[var(--muted)]">{uploading ? "Uploading..." : "Upload one or more to R2"}</span>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block text-xs">
+              <span className="mb-1 block text-[var(--muted)]">Main / thumbnail</span>
+              <input
+                type="file"
+                accept="image/*,.heic,.heif,.jpg,.jpeg,.png,.webp,.gif"
+                disabled={uploading}
+                onChange={(event) => {
+                  const files = event.target.files;
+                  if (files?.length) {
+                    void uploadFiles(files, "main");
+                    event.target.value = "";
+                  }
+                }}
+                className="text-sm"
+              />
+            </label>
+            <label className="block text-xs">
+              <span className="mb-1 block text-[var(--muted)]">Additional gallery images</span>
+              <input
+                type="file"
+                accept="image/*,.heic,.heif,.jpg,.jpeg,.png,.webp,.gif"
+                multiple
+                disabled={uploading}
+                onChange={(event) => {
+                  const files = event.target.files;
+                  if (files?.length) {
+                    void uploadFiles(files, "gallery");
+                    event.target.value = "";
+                  }
+                }}
+                className="text-sm"
+              />
+            </label>
           </div>
+          <p className="mt-2 text-xs text-[var(--muted)]">
+            {uploading ? "Uploading..." : "Photos are compressed automatically before upload."}
+          </p>
+          {uploadError ? <p className="mt-2 text-sm text-red-300">{uploadError}</p> : null}
 
           {allImages.length > 0 ? (
             <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">

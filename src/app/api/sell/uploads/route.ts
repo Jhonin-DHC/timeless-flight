@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
+import { guessImageContentType, isAllowedListingImage, isUploadFile } from "@/lib/listing-image-upload";
 import { isR2Configured, uploadListingImage } from "@/lib/r2";
 
-const MAX_BYTES = 8 * 1024 * 1024;
-const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const MAX_BYTES = 12 * 1024 * 1024;
+
+export const runtime = "nodejs";
+export const maxDuration = 30;
 
 export async function POST(request: Request) {
   try {
@@ -18,17 +21,24 @@ export async function POST(request: Request) {
 
     const formData = await request.formData();
     const file = formData.get("file");
-    if (!(file instanceof File)) {
+    if (!isUploadFile(file)) {
       return NextResponse.json({ error: "file is required." }, { status: 400 });
     }
-    if (!ALLOWED.has(file.type)) {
+
+    const named = file as File;
+    const filename = named.name || "watch.jpg";
+    if (!isAllowedListingImage({ name: filename, type: named.type })) {
       return NextResponse.json({ error: "Only JPEG, PNG, WebP, and GIF images are allowed." }, { status: 400 });
     }
-    if (file.size > MAX_BYTES) {
-      return NextResponse.json({ error: "Image must be 8MB or smaller." }, { status: 400 });
+
+    if (!file.size || file.size > MAX_BYTES) {
+      return NextResponse.json({ error: "Image must be 12MB or smaller." }, { status: 400 });
     }
 
-    const uploaded = await uploadListingImage(file);
+    const contentType = guessImageContentType({ name: filename, type: named.type });
+    const uploadFile = new File([await file.arrayBuffer()], filename, { type: contentType });
+
+    const uploaded = await uploadListingImage(uploadFile);
     return NextResponse.json({ ok: true, url: uploaded.url, key: uploaded.key });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Upload failed.";

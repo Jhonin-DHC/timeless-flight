@@ -1,4 +1,4 @@
-import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
 
@@ -119,7 +119,6 @@ async function putPublicObject(key: string, file: File, fallbackType: string) {
         CacheControl: "public, max-age=31536000, immutable"
       })
     );
-    await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Unknown R2 error";
     throw new Error(`R2 upload failed: ${detail}`);
