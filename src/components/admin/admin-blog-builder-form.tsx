@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { bodyLooksLikeHtml } from "@/lib/blog-cover";
 import { prepareListingImage } from "@/lib/listing-image-upload";
 import { slugifyBlogTitle } from "@/lib/blog-slug";
 import {
@@ -54,7 +55,6 @@ export function AdminBlogBuilderForm({ editing, onSaved, onCancel }: AdminBlogBu
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!editing) {
@@ -78,44 +78,50 @@ export function AdminBlogBuilderForm({ editing, onSaved, onCancel }: AdminBlogBu
     setStatus(null);
   }, [editing]);
 
-  const insertMarkdown = (snippet: string) => {
-    const el = bodyRef.current;
-    if (!el) {
-      setForm((current) => ({ ...current, body: `${current.body}\n${snippet}` }));
+  const uploadImage = async (fileList: FileList | null) => {
+    const originals = Array.from(fileList ?? []);
+    if (originals.length === 0) return;
+    if (originals.length > 40) {
+      setError("Select up to 40 photos at a time. You can insert more after that.");
       return;
     }
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const next = `${form.body.slice(0, start)}${snippet}${form.body.slice(end)}`;
-    setForm((current) => ({ ...current, body: next }));
-    requestAnimationFrame(() => {
-      el.focus();
-      const pos = start + snippet.length;
-      el.setSelectionRange(pos, pos);
-    });
-  };
 
-  const uploadImage = async (fileList: FileList | null) => {
-    const original = fileList?.[0];
-    if (!original) return;
     setUploading(true);
     setError(null);
+    const failures: string[] = [];
+    let nextBody = form.body;
+    let inserted = 0;
+
     try {
-      const file = await prepareListingImage(original);
-      const body = new FormData();
-      body.append("file", file);
-      body.append("slug", form.slug || slugifyBlogTitle(form.title) || "untitled");
-      body.append("locale", BLOG_LOCALE);
-      const response = await fetch("/api/admin/blogs/upload-image", { method: "POST", body });
-      const payload = await response.json();
-      if (!response.ok || !payload.publicUrl) {
-        throw new Error(payload.error ?? "Upload failed.");
+      for (const original of originals) {
+        try {
+          const file = await prepareListingImage(original);
+          const payloadBody = new FormData();
+          payloadBody.append("file", file);
+          payloadBody.append("slug", form.slug || slugifyBlogTitle(form.title) || "untitled");
+          payloadBody.append("locale", BLOG_LOCALE);
+          const response = await fetch("/api/admin/blogs/upload-image", { method: "POST", body: payloadBody });
+          const payload = await response.json();
+          if (!response.ok || !payload.publicUrl) {
+            failures.push(`${original.name}: ${payload.error ?? "Upload failed."}`);
+            continue;
+          }
+          const alt = original.name.replace(/\.[^.]+$/, "") || "image";
+          const url = payload.publicUrl as string;
+          const snippet = bodyLooksLikeHtml(nextBody)
+            ? `\n<p><img src="${url}" alt="${alt}" /></p>\n`
+            : `\n![${alt}](${url})\n`;
+          nextBody = `${nextBody}${snippet}`;
+          inserted += 1;
+        } catch (uploadError) {
+          failures.push(`${original.name}: ${uploadError instanceof Error ? uploadError.message : "Upload failed."}`);
+        }
       }
-      const alt = original.name.replace(/\.[^.]+$/, "") || "image";
-      insertMarkdown(`\n![${alt}](${payload.publicUrl as string})\n`);
-      setStatus("Image inserted into the body.");
-    } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "Image upload failed.");
+      setForm((current) => ({ ...current, body: nextBody }));
+      if (inserted > 0) {
+        setStatus(inserted === 1 ? "Image inserted into the body." : `${inserted} images inserted into the body.`);
+      }
+      if (failures.length > 0) setError(failures.join(" "));
     } finally {
       setUploading(false);
     }
@@ -156,7 +162,8 @@ export function AdminBlogBuilderForm({ editing, onSaved, onCancel }: AdminBlogBu
       <div>
         <h3 className="text-lg font-semibold">{editing ? "Edit post" : "New post"}</h3>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          Markdown body with headings, links, and images. The first image becomes the cover.
+          Paste HTML or markdown. Tags like &lt;p&gt;, &lt;h2&gt;, &lt;strong&gt;, and &lt;img&gt; render on the public
+          page. Insert as many photos as the story needs (up to 40 at a time). The first image becomes the cover.
         </p>
       </div>
 
@@ -231,24 +238,24 @@ export function AdminBlogBuilderForm({ editing, onSaved, onCancel }: AdminBlogBu
           />
         </label>
         <label className="block space-y-1 text-sm md:col-span-2">
-          <span className="text-[var(--muted)]">Body (markdown)</span>
+          <span className="text-[var(--muted)]">Body (HTML or markdown)</span>
           <textarea
-            ref={bodyRef}
             value={form.body}
             onChange={(event) => setForm({ ...form, body: event.target.value })}
-            rows={14}
-            placeholder={"## Heading\n\nParagraph with a [link](/listings).\n\n![alt](image-url)"}
-            className={`${inputClass} font-mono text-[13px] leading-6`}
+            rows={18}
+            placeholder={'<p>Paragraph</p>\n<h2>Heading</h2>\n<p>The <strong>watch</strong> is...</p>'}
+            className={`${inputClass} min-h-64 font-mono text-[13px] leading-6`}
           />
         </label>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <label className="btn-gradient-secondary cursor-pointer text-sm">
-          {uploading ? "Uploading..." : "Insert image"}
+          {uploading ? "Uploading..." : "Insert images"}
           <input
             type="file"
             accept="image/*,.jpg,.jpeg,.png,.webp,.gif"
+            multiple
             className="hidden"
             disabled={uploading}
             onChange={(event) => {

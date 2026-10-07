@@ -10,7 +10,7 @@ export default async function BlogsPage() {
     <section className="space-y-6">
       <div>
         <h1 className="section-title">Blog Resources</h1>
-        <p className="section-copy mt-2 max-w-3xl">Buying notes, market context, and collector guidance from The Aviators Watch desk.</p>
+        <p className="section-copy mt-2 max-w-4xl">Buying notes, market context, and collector guidance from The Aviators Watch desk.</p>
       </div>
       <BlogsIndex posts={posts} />
     </section>

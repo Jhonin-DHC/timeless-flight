@@ -8,7 +8,7 @@ export function BlogsIndex({ posts }: { posts: PublicBlog[] }) {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {posts.map((post) => (
         <article key={post.slug} className="glass-card flex flex-col overflow-hidden p-0">
           {post.coverUrl ? (
