@@ -4,7 +4,7 @@ const KNOWN_CUSTOM_R2_HOSTS = ["images.theaviatorswatch.com"];
 function isAllowedMediaKey(key: string) {
   return (
     Boolean(key) &&
-    (key.startsWith("listings/") || key.startsWith("videos/")) &&
+    (key.startsWith("listings/") || key.startsWith("videos/") || key.startsWith("blogs/")) &&
     !key.includes("..") &&
     !key.includes("\\")
   );

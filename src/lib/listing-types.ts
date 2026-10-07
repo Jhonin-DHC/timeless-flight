@@ -10,6 +10,68 @@ export const VINTAGE_AGE_YEARS = 20;
 export const LISTING_CATEGORIES = ["shop", "vintage", "project"] as const;
 export type ListingCategory = (typeof LISTING_CATEGORIES)[number];
 
+export const MAJOR_WATCH_BRANDS = [
+  "Rolex",
+  "Omega",
+  "Tudor",
+  "Breitling",
+  "TAG Heuer",
+  "IWC",
+  "Panerai",
+  "Cartier",
+  "Patek Philippe",
+  "Audemars Piguet",
+  "Vacheron Constantin",
+  "Jaeger-LeCoultre",
+  "Zenith",
+  "Longines",
+  "Hamilton",
+  "Sinn",
+  "Bell & Ross",
+  "Oris",
+  "Grand Seiko",
+  "Seiko",
+  "Citizen",
+  "Tissot",
+  "Casio",
+  "Hublot",
+  "Blancpain",
+  "Richard Mille",
+  "Bulova"
+] as const;
+
+export function catalogWatchBrands(inventoryBrands: Array<string | undefined> = []) {
+  const extras: string[] = [];
+  const majorKeys = new Set(MAJOR_WATCH_BRANDS.map((brand) => brand.toLowerCase()));
+  const extraKeys = new Set<string>();
+
+  for (const brand of inventoryBrands) {
+    const trimmed = brand?.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (majorKeys.has(key) || extraKeys.has(key)) continue;
+    extraKeys.add(key);
+    extras.push(trimmed);
+  }
+
+  extras.sort((a, b) => a.localeCompare(b));
+  return [...MAJOR_WATCH_BRANDS, ...extras];
+}
+
+export function parseListingSearchParams(searchParams: Record<string, string | string[] | undefined>) {
+  const pick = (key: string) => {
+    const value = searchParams[key];
+    if (typeof value === "string") return value;
+    if (Array.isArray(value)) return value[0] ?? "";
+    return "";
+  };
+
+  return {
+    query: pick("q").trim(),
+    brand: pick("brand").trim() || "all"
+  };
+}
+
 export const LISTING_CONDITIONS = ["New", "Excellent", "Very Good", "Good", "Fair"] as const;
 export type ListingCondition = (typeof LISTING_CONDITIONS)[number];
 

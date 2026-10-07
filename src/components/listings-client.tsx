@@ -1,14 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { ListingCard } from "@/components/listing-card";
-import { listingSection, type ListingCategory, type ShopListing } from "@/lib/listing-types";
+import { catalogWatchBrands, listingSection, type ListingCategory, type ShopListing } from "@/lib/listing-types";
 
 interface ListingsClientProps {
   listings: ShopListing[];
   heading?: string;
   intro?: string;
   presetSection?: ListingCategory;
+  initialQuery?: string;
+  initialBrand?: string;
 }
 
 type SortKey = "featured" | "price-asc" | "price-desc" | "year-desc" | "name-asc";
@@ -17,16 +20,27 @@ function unique(values: Array<string | undefined>) {
   return [...new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))].sort();
 }
 
-export function ListingsClient({ listings, heading = "Watches", intro, presetSection }: ListingsClientProps) {
-  const [query, setQuery] = useState("");
-  const [brandFilter, setBrandFilter] = useState("all");
+function brandsMatch(listingBrand: string, filterBrand: string) {
+  return listingBrand.trim().toLowerCase() === filterBrand.trim().toLowerCase();
+}
+
+export function ListingsClient({
+  listings,
+  heading = "Watches",
+  intro,
+  presetSection,
+  initialQuery = "",
+  initialBrand = "all"
+}: ListingsClientProps) {
+  const [query, setQuery] = useState(initialQuery);
+  const [brandFilter, setBrandFilter] = useState(initialBrand || "all");
   const [collectionFilter, setCollectionFilter] = useState("all");
   const [availability, setAvailability] = useState<"all" | "in-stock" | "preorder">("all");
   const [sectionFilter, setSectionFilter] = useState<"all" | ListingCategory>(presetSection ?? "all");
   const [maxPrice, setMaxPrice] = useState("all");
   const [sortBy, setSortBy] = useState<SortKey>("featured");
 
-  const brands = useMemo(() => unique(listings.map((item) => item.brand)), [listings]);
+  const brands = useMemo(() => catalogWatchBrands(listings.map((item) => item.brand)), [listings]);
   const collections = useMemo(() => unique(listings.map((item) => item.collection)), [listings]);
   const prices = listings.map((item) => item.priceUsd);
   const highest = prices.length ? Math.max(...prices) : 0;
@@ -41,7 +55,7 @@ export function ListingsClient({ listings, heading = "Watches", intro, presetSec
         .join(" ")
         .toLowerCase();
       const matchesQuery = normalized.length === 0 || haystack.includes(normalized);
-      const matchesBrand = brandFilter === "all" || listing.brand === brandFilter;
+      const matchesBrand = brandFilter === "all" || brandsMatch(listing.brand, brandFilter);
       const matchesCollection = collectionFilter === "all" || listing.collection === collectionFilter;
       const section = listingSection(listing);
       const matchesSection = sectionFilter === "all" || section === sectionFilter;
@@ -50,8 +64,7 @@ export function ListingsClient({ listings, heading = "Watches", intro, presetSec
         (availability === "in-stock" && listing.inStock) ||
         (availability === "preorder" && !listing.inStock);
       const matchesPrice =
-        maxPrice === "all" ||
-        (listing.priceUsd > 0 && !listing.callForPricing && listing.priceUsd <= cap);
+        maxPrice === "all" || (listing.priceUsd > 0 && !listing.callForPricing && listing.priceUsd <= cap);
       return matchesQuery && matchesBrand && matchesCollection && matchesSection && matchesAvailability && matchesPrice;
     });
 
@@ -68,6 +81,7 @@ export function ListingsClient({ listings, heading = "Watches", intro, presetSec
   }, [listings, query, brandFilter, collectionFilter, availability, sectionFilter, maxPrice, sortBy]);
 
   const selectClass = "w-full rounded-xl border border-white/15 bg-[#111a30] px-3 py-2 text-sm";
+  const browseAllHref = brandFilter !== "all" ? `/listings?brand=${encodeURIComponent(brandFilter)}` : "/listings";
 
   return (
     <div className="space-y-6">
@@ -178,7 +192,18 @@ export function ListingsClient({ listings, heading = "Watches", intro, presetSec
             ))}
           </div>
           {filtered.length === 0 ? (
-            <p className="mt-6 text-sm text-[var(--muted)]">No watches match your filters.</p>
+            <p className="mt-6 text-sm text-[var(--muted)]">
+              No watches match your filters.
+              {presetSection && brandFilter !== "all" ? (
+                <>
+                  {" "}
+                  <Link href={browseAllHref} className="text-[var(--brand-a)]">
+                    Search all watches for {brandFilter}
+                  </Link>
+                  .
+                </>
+              ) : null}
+            </p>
           ) : null}
         </div>
       </div>

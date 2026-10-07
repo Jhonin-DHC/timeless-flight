@@ -35,7 +35,7 @@ function createR2Client() {
 export function isAllowedMediaKey(key: string) {
   return (
     Boolean(key) &&
-    (key.startsWith("listings/") || key.startsWith("videos/")) &&
+    (key.startsWith("listings/") || key.startsWith("videos/") || key.startsWith("blogs/")) &&
     !key.includes("..") &&
     !key.includes("\\")
   );
@@ -130,6 +130,16 @@ async function putPublicObject(key: string, file: File, fallbackType: string) {
 export async function uploadListingImage(file: File) {
   const extension = file.name.includes(".") ? file.name.split(".").pop() : "jpg";
   const key = `listings/${randomUUID()}-${sanitizeFilename(file.name || `watch.${extension}`)}`;
+  const uploaded = await putPublicObject(key, file, "image/jpeg");
+  return { key: uploaded.key, url: uploaded.url };
+}
+
+export async function uploadBlogImage(file: File, input: { locale?: string; slug?: string } = {}) {
+  const locale = sanitizeFilename(input.locale || "en") || "en";
+  const slug = sanitizeFilename(input.slug || "untitled") || "untitled";
+  const extension = file.name.includes(".") ? file.name.split(".").pop() : "jpg";
+  const filename = sanitizeFilename(file.name || `image.${extension}`);
+  const key = `blogs/${locale}/${slug}/${Date.now()}-${filename}`;
   const uploaded = await putPublicObject(key, file, "image/jpeg");
   return { key: uploaded.key, url: uploaded.url };
 }

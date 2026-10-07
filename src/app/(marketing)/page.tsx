@@ -3,6 +3,7 @@ import { ListingCard } from "@/components/listing-card";
 import { PortfolioCard } from "@/components/portfolio-card";
 import { TestimonialsSection } from "@/components/testimonials-section";
 import { VideoPlayer } from "@/components/video-player";
+import { WatchSearchForm } from "@/components/watch-search-form";
 import { getPublishedListings } from "@/lib/listings-service";
 import { getFeaturedVideos } from "@/lib/videos-service";
 import { portfolioCategories } from "@/data/portfolio";
@@ -14,39 +15,46 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-10 md:space-y-14">
-      <section className="glass-panel space-y-5">
-        <p className="text-sm uppercase tracking-[0.2em] text-[var(--brand-c)]">The Aviators Watch</p>
-        <h1 className="max-w-4xl text-4xl font-semibold leading-tight md:text-6xl">
-          Turn Your Unused Branded Watches Into Cash Today
-        </h1>
-        <p className="max-w-3xl text-lg font-medium text-[var(--foreground)] md:text-xl">
-          Running or not running, with or without papers — we&apos;ll take them all.
-        </p>
-        <p className="section-copy max-w-3xl">
-          Complete our{" "}
-          <Link href="/sell/intake" className="font-semibold text-[var(--brand-a)]">
-            Watch Intake Form
-          </Link>{" "}
-          in just a few minutes to get started with your{" "}
-          <span className="font-semibold text-[var(--foreground)]">free, no-obligation valuation.</span>
-        </p>
-        <p className="section-copy max-w-3xl">
-          Whether you want to{" "}
-          <span className="font-semibold text-[var(--foreground)]">sell outright</span> or{" "}
-          <span className="font-semibold text-[var(--foreground)]">exchange for another timepiece</span>, we
-          make the process simple, smart, and stress-free.
-        </p>
-        <div className="mt-2 flex flex-wrap gap-3">
-          <Link href="/sell/intake" className="btn-gradient-primary">
-            Sell Your Branded Watch Today!
-          </Link>
-          <Link href="/sell" className="btn-gradient-secondary">
-            Learn more — We Buy Branded Watches
-          </Link>
-          <Link href="/listings" className="btn-gradient-secondary">
-            Shop watches
-          </Link>
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,0.85fr)] lg:items-stretch">
+        <div className="glass-panel flex flex-col justify-center space-y-5">
+          <p className="text-sm uppercase tracking-[0.2em] text-[var(--brand-c)]">The Aviators Watch</p>
+          <h1 className="max-w-4xl text-4xl font-semibold leading-tight md:text-6xl">Shop branded watches</h1>
+          <p className="section-copy max-w-3xl">
+            Search by brand, model, or reference — including current pieces, vintage, limited editions, and project
+            watches.
+          </p>
+          <WatchSearchForm extraBrands={listings.map((listing) => listing.brand)} />
+          <div className="flex flex-wrap gap-3">
+            <Link href="/listings" className="btn-gradient-primary">
+              Browse all watches
+            </Link>
+            <Link href="/vintage" className="btn-gradient-secondary">
+              Vintage
+            </Link>
+            <Link href="/limited-editions" className="btn-gradient-secondary">
+              Limited editions
+            </Link>
+          </div>
         </div>
+
+        <aside className="glass-card flex flex-col justify-between gap-4 lg:min-h-full">
+          <div className="space-y-3">
+            <p className="text-xs uppercase tracking-[0.18em] text-[var(--brand-c)]">Also available</p>
+            <h2 className="text-xl font-semibold leading-snug md:text-2xl">Sell your unused branded watches</h2>
+            <p className="text-sm leading-relaxed text-[var(--muted)]">
+              Running or not, papers or not — get a free, no-obligation valuation. Sell outright or exchange toward
+              another timepiece.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Link href="/sell/intake" className="btn-gradient-secondary text-center text-sm">
+              Get a free valuation
+            </Link>
+            <Link href="/sell" className="text-center text-sm text-[var(--brand-a)]">
+              We buy branded watches
+            </Link>
+          </div>
+        </aside>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
