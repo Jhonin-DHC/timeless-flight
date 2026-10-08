@@ -58,6 +58,47 @@ export function catalogWatchBrands(inventoryBrands: Array<string | undefined> = 
   return [...MAJOR_WATCH_BRANDS, ...extras];
 }
 
+export function canonicalWatchBrand(brand: string) {
+  const trimmed = brand.trim();
+  if (!trimmed) return trimmed;
+  const key = trimmed.toLowerCase();
+  return MAJOR_WATCH_BRANDS.find((item) => item.toLowerCase() === key) ?? trimmed;
+}
+
+function searchableText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+export function listingMatchesBrand(
+  listing: Pick<ShopListing, "brand" | "name" | "slug">,
+  filterBrand: string
+) {
+  const filter = searchableText(filterBrand);
+  if (!filter || filter === "all") return true;
+  const brand = searchableText(listing.brand);
+  const name = searchableText(listing.name);
+  const slug = searchableText(listing.slug || "");
+  if (brand === filter) return true;
+  if (brand.includes(filter)) return true;
+  if (filter.length >= 4 && filter.includes(brand) && brand.length >= 4) return true;
+  if (name.includes(filter) || slug.includes(filter)) return true;
+  return false;
+}
+
+export function listingMatchesQuery(
+  listing: Pick<ShopListing, "name" | "brand" | "referenceNumber" | "collection" | "description" | "slug">,
+  query: string
+) {
+  const tokens = searchableText(query).split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+  const haystack = searchableText(
+    [listing.name, listing.brand, listing.referenceNumber, listing.collection, listing.description, listing.slug]
+      .filter(Boolean)
+      .join(" ")
+  );
+  return tokens.every((token) => haystack.includes(token));
+}
+
 export function parseListingSearchParams(searchParams: Record<string, string | string[] | undefined>) {
   const pick = (key: string) => {
     const value = searchParams[key];

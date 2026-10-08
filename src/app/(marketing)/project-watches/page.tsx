@@ -1,5 +1,5 @@
 import { ListingsClient } from "@/components/listings-client";
-import { filterBySection, getPublishedListings } from "@/lib/listings-service";
+import { getPublishedListings } from "@/lib/listings-service";
 import { parseListingSearchParams } from "@/lib/listing-types";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export default async function ProjectWatchesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const listings = filterBySection(await getPublishedListings(), "project");
+  const listings = await getPublishedListings();
   const { query, brand } = parseListingSearchParams(await searchParams);
 
   return (

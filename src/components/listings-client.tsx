@@ -1,15 +1,24 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ListingCard } from "@/components/listing-card";
-import { catalogWatchBrands, listingSection, type ListingCategory, type ShopListing } from "@/lib/listing-types";
+import {
+  catalogWatchBrands,
+  listingMatchesBrand,
+  listingMatchesQuery,
+  listingSection,
+  type ListingCategory,
+  type ShopListing
+} from "@/lib/listing-types";
 
 interface ListingsClientProps {
   listings: ShopListing[];
   heading?: string;
   intro?: string;
   presetSection?: ListingCategory;
+  presetLimited?: boolean;
   initialQuery?: string;
   initialBrand?: string;
 }
@@ -20,15 +29,31 @@ function unique(values: Array<string | undefined>) {
   return [...new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))].sort();
 }
 
-function brandsMatch(listingBrand: string, filterBrand: string) {
-  return listingBrand.trim().toLowerCase() === filterBrand.trim().toLowerCase();
+export function ListingsClient(props: ListingsClientProps) {
+  return (
+    <Suspense fallback={<ListingsClientInner {...props} />}>
+      <ListingsFromUrl {...props} />
+    </Suspense>
+  );
 }
 
-export function ListingsClient({
+function ListingsFromUrl(props: ListingsClientProps) {
+  const searchParams = useSearchParams();
+  return (
+    <ListingsClientInner
+      {...props}
+      initialQuery={searchParams.get("q")?.trim() || props.initialQuery || ""}
+      initialBrand={searchParams.get("brand")?.trim() || props.initialBrand || "all"}
+    />
+  );
+}
+
+function ListingsClientInner({
   listings,
   heading = "Watches",
   intro,
   presetSection,
+  presetLimited = false,
   initialQuery = "",
   initialBrand = "all"
 }: ListingsClientProps) {
@@ -44,28 +69,38 @@ export function ListingsClient({
   const collections = useMemo(() => unique(listings.map((item) => item.collection)), [listings]);
   const prices = listings.map((item) => item.priceUsd);
   const highest = prices.length ? Math.max(...prices) : 0;
+  const isSearching = query.trim().length > 0 || (brandFilter !== "all" && Boolean(brandFilter));
+
+  useEffect(() => {
+    setQuery(initialQuery);
+    setBrandFilter(initialBrand || "all");
+  }, [initialQuery, initialBrand]);
 
   const filtered = useMemo(() => {
-    const normalized = query.toLowerCase().trim();
     const cap = maxPrice === "all" ? Number.POSITIVE_INFINITY : Number(maxPrice);
 
     const results = listings.filter((listing) => {
-      const haystack = [listing.name, listing.brand, listing.referenceNumber, listing.collection, listing.description]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      const matchesQuery = normalized.length === 0 || haystack.includes(normalized);
-      const matchesBrand = brandFilter === "all" || brandsMatch(listing.brand, brandFilter);
+      const matchesQuery = listingMatchesQuery(listing, query);
+      const matchesBrand = listingMatchesBrand(listing, brandFilter);
       const matchesCollection = collectionFilter === "all" || listing.collection === collectionFilter;
       const section = listingSection(listing);
-      const matchesSection = sectionFilter === "all" || section === sectionFilter;
+      const matchesSection = isSearching || sectionFilter === "all" || section === sectionFilter;
+      const matchesLimited = isSearching || !presetLimited || Boolean(listing.limitedEdition);
       const matchesAvailability =
         availability === "all" ||
         (availability === "in-stock" && listing.inStock) ||
         (availability === "preorder" && !listing.inStock);
       const matchesPrice =
         maxPrice === "all" || (listing.priceUsd > 0 && !listing.callForPricing && listing.priceUsd <= cap);
-      return matchesQuery && matchesBrand && matchesCollection && matchesSection && matchesAvailability && matchesPrice;
+      return (
+        matchesQuery &&
+        matchesBrand &&
+        matchesCollection &&
+        matchesSection &&
+        matchesLimited &&
+        matchesAvailability &&
+        matchesPrice
+      );
     });
 
     const sorted = [...results];
@@ -78,7 +113,7 @@ export function ListingsClient({
     if (sortBy === "year-desc") sorted.sort((a, b) => b.year - a.year);
     if (sortBy === "name-asc") sorted.sort((a, b) => a.name.localeCompare(b.name));
     return sorted;
-  }, [listings, query, brandFilter, collectionFilter, availability, sectionFilter, maxPrice, sortBy]);
+  }, [listings, query, brandFilter, collectionFilter, availability, sectionFilter, maxPrice, sortBy, isSearching, presetLimited]);
 
   const selectClass = "w-full rounded-xl border border-white/15 bg-[#111a30] px-3 py-2 text-sm";
   const browseAllHref = brandFilter !== "all" ? `/listings?brand=${encodeURIComponent(brandFilter)}` : "/listings";
@@ -91,6 +126,7 @@ export function ListingsClient({
           {intro ? <p className="section-copy mt-2 max-w-3xl">{intro}</p> : null}
           <p className="mt-3 text-sm text-[var(--muted)]">
             {filtered.length.toLocaleString()} watch{filtered.length === 1 ? "" : "es"}
+            {isSearching && (presetSection || presetLimited) ? " across the full catalog" : ""}
           </p>
         </div>
         <select
@@ -194,11 +230,11 @@ export function ListingsClient({
           {filtered.length === 0 ? (
             <p className="mt-6 text-sm text-[var(--muted)]">
               No watches match your filters.
-              {presetSection && brandFilter !== "all" ? (
+              {brandFilter !== "all" || query.trim() ? (
                 <>
                   {" "}
                   <Link href={browseAllHref} className="text-[var(--brand-a)]">
-                    Search all watches for {brandFilter}
+                    Browse all watches
                   </Link>
                   .
                 </>

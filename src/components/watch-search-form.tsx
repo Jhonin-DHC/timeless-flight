@@ -24,7 +24,7 @@ export function WatchSearchForm({
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const query = String(data.get("q") || "").trim();
-    const brand = String(data.get("brand") || "all");
+    const brand = String(data.get("brand") || "all").trim();
     const params = new URLSearchParams();
     if (query) params.set("q", query);
     if (brand && brand !== "all") params.set("brand", brand);
@@ -33,7 +33,7 @@ export function WatchSearchForm({
   };
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-stretch" role="search">
+    <form action={action} method="get" onSubmit={onSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-stretch" role="search">
       <label className="sm:w-48">
         <span className="sr-only">Brand</span>
         <select

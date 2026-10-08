@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { RemoteImage } from "@/components/remote-image";
 import { prepareListingImage } from "@/lib/listing-image-upload";
-import { PLACEHOLDER_IMAGE, isPlaceholderImage } from "@/lib/listing-types";
+import { PLACEHOLDER_IMAGE, canonicalWatchBrand, isPlaceholderImage } from "@/lib/listing-types";
 
 interface ListingRow {
   _id: string;
@@ -253,6 +253,7 @@ export function ListingsManager() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
+        brand: canonicalWatchBrand(form.brand),
         storefrontProductId: form.slug,
         imageUrl: form.imageUrl || PLACEHOLDER_IMAGE,
         imageUrls: form.imageUrls.filter((url) => url && url !== form.imageUrl && !isPlaceholderImage(url))

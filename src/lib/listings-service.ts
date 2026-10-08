@@ -1,6 +1,7 @@
 import { connectMongo } from "@/lib/mongodb";
 import { normalizePublicImageUrl, normalizePublicImageUrls } from "@/lib/r2";
 import {
+  canonicalWatchBrand,
   listingSection,
   PLACEHOLDER_IMAGE,
   type ListingCategory,
@@ -40,7 +41,7 @@ function asPublicListing(input: {
     storefrontProductId: input.storefrontProductId || input.slug,
     slug: input.slug,
     name: input.name,
-    brand: input.brand,
+    brand: canonicalWatchBrand(input.brand || ""),
     referenceNumber: input.referenceNumber || "",
     collection: input.collection || "",
     condition: input.condition as ListingCondition,
