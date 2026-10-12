@@ -185,11 +185,9 @@ export function AdminBlogPostsTable({ posts, onEdit, onChanged }: AdminBlogPosts
                     <button type="button" className="text-xs text-[var(--brand-a)]" onClick={() => onEdit(post)}>
                       Edit
                     </button>
-                    {post.status === "published" ? (
-                      <a href={publicBlogPath(post.slug)} target="_blank" rel="noreferrer" className="text-xs text-[var(--brand-a)]">
-                        View
-                      </a>
-                    ) : null}
+                    <a href={publicBlogPath(post.slug)} target="_blank" rel="noreferrer" className="text-xs text-[var(--brand-a)]">
+                      {post.status === "published" ? "View" : "Preview"}
+                    </a>
                     <button type="button" className="text-xs text-red-300" onClick={() => void removeOne(post)}>
                       Delete
                     </button>

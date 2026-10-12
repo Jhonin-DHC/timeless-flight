@@ -18,6 +18,10 @@ export function extractCoverImage(body: string) {
   return { alt: "", url: "" };
 }
 
+export function bodyContainsImageUrl(body: string, url: string) {
+  return Boolean(url) && body.includes(url);
+}
+
 export function bodyLooksLikeHtml(body: string) {
   return /<\/?(p|h[1-6]|strong|em|ul|ol|li|img|br|div|span|blockquote|figure|a)\b/i.test(body);
 }

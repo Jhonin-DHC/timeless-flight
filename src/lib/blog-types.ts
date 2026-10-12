@@ -14,6 +14,12 @@ export const BLOG_CATEGORY_LABELS: Record<BlogCategory, string> = {
   selling: "Selling"
 };
 
+export interface BlogImage {
+  url: string;
+  alt: string;
+  caption: string;
+}
+
 export interface AdminBlog {
   id: string;
   slug: string;
@@ -29,6 +35,8 @@ export interface AdminBlog {
   updatedByEmail: string;
   coverUrl: string;
   coverAlt: string;
+  images: BlogImage[];
+  previousSlugs: string[];
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -45,6 +53,7 @@ export interface PublicBlog {
   readingMinutes: number;
   coverUrl: string;
   coverAlt: string;
+  images: BlogImage[];
 }
 
 export function isBlogCategory(value: string): value is BlogCategory {

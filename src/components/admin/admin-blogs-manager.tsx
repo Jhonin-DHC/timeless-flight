@@ -1,13 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { AdminBlogBuilderForm } from "@/components/admin/admin-blog-builder-form";
+import { useRouter } from "next/navigation";
 import { AdminBlogPostsTable } from "@/components/admin/admin-blog-posts-table";
 import type { AdminBlog } from "@/lib/blog-types";
 
 export function AdminBlogsManager() {
+  const router = useRouter();
   const [posts, setPosts] = useState<AdminBlog[]>([]);
-  const [editing, setEditing] = useState<AdminBlog | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
@@ -27,27 +28,19 @@ export function AdminBlogsManager() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="section-title">Blogs</h2>
-        <p className="section-copy">
-          Write markdown posts, insert images, and publish them to Resources → Blogs. Drafts stay off the public site.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="section-title">Blogs</h2>
+          <p className="section-copy">Write, preview drafts, and publish posts to Resources → Blogs.</p>
+        </div>
+        <Link href="/admin/blogs/new" className="btn-gradient-primary text-sm">
+          New post
+        </Link>
       </div>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      <AdminBlogBuilderForm
-        editing={editing}
-        onSaved={async () => {
-          await load();
-          setEditing(null);
-        }}
-        onCancel={() => setEditing(null)}
-      />
       <AdminBlogPostsTable
         posts={posts}
-        onEdit={(post) => {
-          setEditing(post);
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }}
+        onEdit={(post) => router.push(`/admin/blogs/${post.slug}`)}
         onChanged={load}
       />
     </div>

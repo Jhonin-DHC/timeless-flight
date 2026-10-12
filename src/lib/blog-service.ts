@@ -9,7 +9,7 @@ import {
   isBlogStatus,
   publicBlogPath,
   type AdminBlog,
-  type BlogCategory,
+  type BlogImage,
   type BlogLocale,
   type BlogStatus,
   type PublicBlog
@@ -28,7 +28,15 @@ export interface BlogPayload {
   body?: string;
   status?: string;
   publishedAt?: string | null;
+  coverUrl?: string;
+  coverAlt?: string;
+  images?: unknown;
 }
+
+export type PublicBlogLookup =
+  | { kind: "post"; post: PublicBlog; isDraftPreview: boolean }
+  | { kind: "redirect"; slug: string }
+  | { kind: "missing" };
 
 function asDateIso(value: unknown) {
   if (!value) return null;
@@ -36,8 +44,36 @@ function asDateIso(value: unknown) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function coverFromBody(body: string) {
-  return extractCoverImage(body);
+function parseImages(input: unknown): BlogImage[] {
+  if (!Array.isArray(input)) return [];
+  const images: BlogImage[] = [];
+  for (const item of input) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const url = typeof record.url === "string" ? record.url.trim() : "";
+    if (!url) continue;
+    images.push({
+      url,
+      alt: typeof record.alt === "string" ? record.alt.trim() : "",
+      caption: typeof record.caption === "string" ? record.caption.trim() : ""
+    });
+  }
+  return images;
+}
+
+function parseSlugList(input: unknown) {
+  if (!Array.isArray(input)) return [];
+  return [...new Set(input.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean))];
+}
+
+function resolveCover(coverUrl: string, coverAlt: string, images: BlogImage[], body: string) {
+  const fromBody = extractCoverImage(body);
+  const url = coverUrl.trim() || images[0]?.url || fromBody.url;
+  const matching = images.find((image) => image.url === url);
+  return {
+    url,
+    alt: coverAlt.trim() || matching?.alt || fromBody.alt
+  };
 }
 
 function toAdminBlog(doc: {
@@ -53,11 +89,16 @@ function toAdminBlog(doc: {
   publishedAt?: Date | string | null;
   readingMinutes?: number;
   updatedByEmail?: string;
+  coverUrl?: string;
+  coverAlt?: string;
+  images?: unknown;
+  previousSlugs?: unknown;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }): AdminBlog {
   const body = doc.body || "";
-  const cover = coverFromBody(body);
+  const images = parseImages(doc.images);
+  const cover = resolveCover(doc.coverUrl || "", doc.coverAlt || "", images, body);
   const category = isBlogCategory(doc.category) ? doc.category : "buying-guides";
   return {
     id: String(doc._id),
@@ -74,6 +115,8 @@ function toAdminBlog(doc: {
     updatedByEmail: doc.updatedByEmail || "",
     coverUrl: cover.url,
     coverAlt: cover.alt,
+    images,
+    previousSlugs: parseSlugList(doc.previousSlugs),
     createdAt: asDateIso(doc.createdAt),
     updatedAt: asDateIso(doc.updatedAt)
   };
@@ -91,7 +134,8 @@ function toPublicBlog(post: AdminBlog): PublicBlog {
     publishedAt: post.publishedAt,
     readingMinutes: post.readingMinutes,
     coverUrl: post.coverUrl,
-    coverAlt: post.coverAlt
+    coverAlt: post.coverAlt,
+    images: post.images
   };
 }
 
@@ -99,7 +143,7 @@ function staticAsPublic(): PublicBlog[] {
   return staticBlogs.map((post) => {
     const category = isBlogCategory(post.category) ? post.category : "buying-guides";
     const body = post.body || post.excerpt;
-    const cover = coverFromBody(body);
+    const cover = extractCoverImage(body);
     return {
       slug: post.slug,
       locale: BLOG_LOCALE,
@@ -111,7 +155,8 @@ function staticAsPublic(): PublicBlog[] {
       publishedAt: null,
       readingMinutes: estimateReadingMinutes(body),
       coverUrl: cover.url,
-      coverAlt: cover.alt
+      coverAlt: cover.alt,
+      images: []
     };
   });
 }
@@ -133,6 +178,13 @@ export function validateBlogPayload(input: BlogPayload) {
   const summary = typeof input.summary === "string" ? input.summary.trim() : "";
   const locale: BlogLocale = defaultBlogLocale();
   const translationOf = typeof input.translationOf === "string" ? input.translationOf.trim() : "";
+  const images = parseImages(input.images);
+  const cover = resolveCover(
+    typeof input.coverUrl === "string" ? input.coverUrl : "",
+    typeof input.coverAlt === "string" ? input.coverAlt : "",
+    images,
+    body
+  );
 
   let publishedAt: Date | null = null;
   if (input.publishedAt) {
@@ -154,7 +206,10 @@ export function validateBlogPayload(input: BlogPayload) {
       body,
       status,
       publishedAt,
-      readingMinutes: estimateReadingMinutes(body)
+      readingMinutes: estimateReadingMinutes(body),
+      coverUrl: cover.url,
+      coverAlt: cover.alt,
+      images
     }
   };
 }
@@ -166,6 +221,7 @@ function duplicateSlugError(error: unknown) {
 
 function revalidateBlogPaths(slug?: string) {
   revalidatePath("/resources/blogs");
+  revalidatePath("/sitemap.xml");
   if (slug) revalidatePath(publicBlogPath(slug));
 }
 
@@ -189,7 +245,7 @@ export async function createBlogPost(input: BlogPayload, updatedByEmail = "") {
 
   await connectMongo();
   try {
-    const doc = await BlogPost.create({ ...value, updatedByEmail });
+    const doc = await BlogPost.create({ ...value, previousSlugs: [], updatedByEmail });
     revalidateBlogPaths(value.slug);
     return { post: toAdminBlog(doc.toObject()) };
   } catch (error) {
@@ -206,10 +262,20 @@ export async function updateBlogPost(currentSlug: string, input: BlogPayload, up
 
   await connectMongo();
   const locale = value.locale;
+  const existing = await BlogPost.findOne({ slug: currentSlug, locale }).lean();
+  if (!existing) return { error: "Post not found." };
+
+  const previousSlugs = parseSlugList(existing.previousSlugs);
+  if (value.slug !== currentSlug) previousSlugs.push(currentSlug);
+
   try {
     const doc = await BlogPost.findOneAndUpdate(
       { slug: currentSlug, locale },
-      { ...value, updatedByEmail },
+      {
+        ...value,
+        previousSlugs: [...new Set(previousSlugs.filter((slug) => slug !== value.slug))],
+        updatedByEmail
+      },
       { new: true }
     ).lean();
     if (!doc) return { error: "Post not found." };
@@ -243,6 +309,7 @@ export async function bulkSetBlogStatus(items: Array<{ slug: string; locale?: st
     if (doc) slugs.push(item.slug);
   }
   revalidatePath("/resources/blogs");
+  revalidatePath("/sitemap.xml");
   for (const slug of slugs) revalidatePath(publicBlogPath(slug));
   return { ok: true as const, count: slugs.length };
 }
@@ -275,12 +342,34 @@ export async function listPublishedBlogs(): Promise<PublicBlog[]> {
 }
 
 export async function getPublishedBlogBySlug(slug: string): Promise<PublicBlog | null> {
+  const lookup = await resolvePublicBlog(slug);
+  return lookup.kind === "post" ? lookup.post : null;
+}
+
+export async function resolvePublicBlog(slug: string, options?: { allowDraft?: boolean }): Promise<PublicBlogLookup> {
+  const allowDraft = Boolean(options?.allowDraft);
+
   try {
     await connectMongo();
-    const doc = await BlogPost.findOne({ slug, locale: BLOG_LOCALE, status: "published" }).lean();
-    if (doc) return toPublicBlog(toAdminBlog(doc));
-    return staticAsPublic().find((post) => post.slug === slug) ?? null;
+    const current = await BlogPost.findOne({ slug, locale: BLOG_LOCALE }).lean();
+    if (current) {
+      if (current.status === "published") {
+        return { kind: "post", post: toPublicBlog(toAdminBlog(current)), isDraftPreview: false };
+      }
+      if (allowDraft) {
+        return { kind: "post", post: toPublicBlog(toAdminBlog(current)), isDraftPreview: true };
+      }
+      return { kind: "missing" };
+    }
+
+    const previous = await BlogPost.findOne({ previousSlugs: slug, locale: BLOG_LOCALE }).lean();
+    if (previous && (previous.status === "published" || allowDraft)) {
+      return { kind: "redirect", slug: previous.slug };
+    }
   } catch {
-    return staticAsPublic().find((post) => post.slug === slug) ?? null;
+    // Fall through to static posts when Mongo is unavailable.
   }
+
+  const fallback = staticAsPublic().find((post) => post.slug === slug);
+  return fallback ? { kind: "post", post: fallback, isDraftPreview: false } : { kind: "missing" };
 }
