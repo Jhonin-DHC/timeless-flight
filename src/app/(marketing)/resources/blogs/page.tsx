@@ -1,7 +1,16 @@
+import type { Metadata } from "next";
 import { BlogsIndex } from "@/components/blog/blogs-index";
 import { listPublishedBlogs } from "@/lib/blog-service";
+import { staticPageMetadata } from "@/lib/listing-seo";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = staticPageMetadata({
+  title: "Watch collecting notes",
+  description:
+    "Buying guides and collector notes on vintage Omega, Seiko Flightmaster, Breitling Super 8, and other branded watches.",
+  path: "/resources/blogs"
+});
 
 export default async function BlogsPage() {
   const posts = await listPublishedBlogs();

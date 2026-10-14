@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { listPublishedBlogs } from "@/lib/blog-service";
 import { publicBlogPath } from "@/lib/blog-types";
+import { brandHubPath, inventoryBrands } from "@/lib/listing-seo";
 import { getPublishedListings } from "@/lib/listings-service";
 import { SITE_URL } from "@/lib/site";
 
@@ -35,6 +36,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6
   }));
 
+  const brandEntries: MetadataRoute.Sitemap = inventoryBrands(listings).map((brand) => ({
+    url: `${SITE_URL}${brandHubPath(brand)}`,
+    changeFrequency: "weekly",
+    priority: 0.65
+  }));
+
   const blogEntries: MetadataRoute.Sitemap = blogs.map((post) => ({
     url: `${SITE_URL}${publicBlogPath(post.slug)}`,
     lastModified: post.publishedAt ? new Date(post.publishedAt) : undefined,
@@ -42,5 +49,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6
   }));
 
-  return [...staticEntries, ...listingEntries, ...blogEntries];
+  return [...staticEntries, ...brandEntries, ...listingEntries, ...blogEntries];
 }

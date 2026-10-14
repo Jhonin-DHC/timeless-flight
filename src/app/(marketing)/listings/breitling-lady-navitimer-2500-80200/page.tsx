@@ -1,8 +1,17 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { ListingModalTrigger } from "@/components/listing-modal-trigger";
+import { staticPageMetadata } from "@/lib/listing-seo";
 
 const watchTitle = "Breitling Lady Navitimer 2500 (Ref. 80200)";
+
+export const metadata: Metadata = staticPageMetadata({
+  title: "Breitling Lady Navitimer 80200",
+  description:
+    "Breitling Lady Navitimer 2500 reference 80200 — compact 30–33mm vintage slide-rule Navitimer with beaded bezel.",
+  path: "/listings/breitling-lady-navitimer-2500-80200"
+});
 
 const keyDetails = [
   {

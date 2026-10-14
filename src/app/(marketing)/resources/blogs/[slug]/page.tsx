@@ -4,6 +4,7 @@ import { BlogArticle } from "@/components/blog/blog-article";
 import { getSessionEmail } from "@/lib/auth";
 import { resolvePublicBlog } from "@/lib/blog-service";
 import { publicBlogPath } from "@/lib/blog-types";
+import { getPublishedListings, listingsRelatedToBlog } from "@/lib/listings-service";
 import { toDisplayImageUrl } from "@/lib/r2-display";
 import { SITE_URL } from "@/lib/site";
 
@@ -66,5 +67,8 @@ export default async function BlogArticlePage({ params }: PageProps) {
   if (lookup.kind === "redirect") permanentRedirect(publicBlogPath(lookup.slug));
   if (lookup.kind !== "post") notFound();
 
-  return <BlogArticle post={lookup.post} draftBanner={lookup.isDraftPreview} />;
+  const listings = await getPublishedListings();
+  const relatedListings = listingsRelatedToBlog(listings, lookup.post);
+
+  return <BlogArticle post={lookup.post} draftBanner={lookup.isDraftPreview} relatedListings={relatedListings} />;
 }

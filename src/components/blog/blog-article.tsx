@@ -2,16 +2,20 @@
 
 import Link from "next/link";
 import { BlogBody } from "@/components/blog/blog-body";
+import { ListingCard } from "@/components/listing-card";
 import { RemoteImage } from "@/components/remote-image";
 import { bodyContainsImageUrl } from "@/lib/blog-cover";
 import type { PublicBlog } from "@/lib/blog-types";
+import type { ShopListing } from "@/lib/listing-types";
 
 export function BlogArticle({
   post,
-  draftBanner = false
+  draftBanner = false,
+  relatedListings = []
 }: {
   post: PublicBlog;
   draftBanner?: boolean;
+  relatedListings?: ShopListing[];
 }) {
   const showCover = Boolean(post.coverUrl) && !bodyContainsImageUrl(post.body, post.coverUrl);
   const gallery = (post.images || []).filter(
@@ -61,6 +65,16 @@ export function BlogArticle({
                 </div>
                 {image.caption ? <figcaption className="text-center text-sm text-[var(--muted)]">{image.caption}</figcaption> : null}
               </figure>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {relatedListings.length > 0 ? (
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold">Watches in this story</h2>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {relatedListings.map((listing) => (
+              <ListingCard key={listing.id} listing={listing} compact />
             ))}
           </div>
         </section>

@@ -4,8 +4,12 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "The Aviators Watch | Curated Timepieces",
-  description: "Curated luxury watches with a modern glassmorphism browsing experience."
+  title: {
+    default: "The Aviators Watch | Curated Timepieces",
+    template: "%s | The Aviators Watch"
+  },
+  description:
+    "Shop branded watches by brand, model, or reference — current pieces, vintage, limited editions, and project watches."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

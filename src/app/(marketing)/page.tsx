@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ListingCard } from "@/components/listing-card";
 import { PortfolioCard } from "@/components/portfolio-card";
@@ -7,8 +8,21 @@ import { WatchSearchForm } from "@/components/watch-search-form";
 import { getPublishedListings } from "@/lib/listings-service";
 import { getFeaturedVideos } from "@/lib/videos-service";
 import { portfolioCategories } from "@/data/portfolio";
+import { staticPageMetadata } from "@/lib/listing-seo";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  ...staticPageMetadata({
+    title: "Shop branded watches",
+    description:
+      "Search branded watches by brand, model, or reference — current pieces, vintage, limited editions, and project watches.",
+    path: "/"
+  }),
+  title: {
+    absolute: "The Aviators Watch | Curated Timepieces"
+  }
+};
 
 export default async function HomePage() {
   const [listings, featuredVideos] = await Promise.all([getPublishedListings(), getFeaturedVideos(3)]);

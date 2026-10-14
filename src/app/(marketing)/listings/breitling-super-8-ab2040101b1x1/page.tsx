@@ -1,8 +1,18 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { ListingModalTrigger } from "@/components/listing-modal-trigger";
+import { staticPageMetadata } from "@/lib/listing-seo";
 
 const watchTitle = "Breitling Super 8 (AB2040101B1X1)";
+const watchPath = "/listings/breitling-super-8-ab2040101b1x1";
+
+export const metadata: Metadata = staticPageMetadata({
+  title: "Breitling Super 8 AB2040101B1X1",
+  description:
+    "Breitling Super 8 reference AB2040101B1X1 — 46mm cockpit-inspired pilot watch with left-side crown and COSC B20 movement.",
+  path: watchPath
+});
 
 const specialistSpecs = [
   {

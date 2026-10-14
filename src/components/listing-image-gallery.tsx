@@ -50,7 +50,7 @@ export function ListingImageGallery({ name, imageUrl, imageUrls = [] }: ListingI
       >
         <RemoteImage
           src={activeImage}
-          alt={name}
+          alt={`${name} photo ${activeIndex + 1}`}
           className="object-contain object-center"
           sizes="(max-width: 768px) 100vw, 80vw"
         />
@@ -65,9 +65,9 @@ export function ListingImageGallery({ name, imageUrl, imageUrls = [] }: ListingI
               className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border ${
                 index === activeIndex ? "border-[var(--brand-a)]" : "border-white/15"
               }`}
-              aria-label={index === 0 ? "Show main image" : `Show image ${index + 1}`}
+              aria-label={`Show ${name} photo ${index + 1}`}
             >
-              <RemoteImage src={url} alt="" className="object-cover" sizes="64px" />
+              <RemoteImage src={url} alt={`${name} photo ${index + 1}`} className="object-cover" sizes="64px" />
             </button>
           ))}
         </div>
@@ -117,7 +117,7 @@ export function ListingImageGallery({ name, imageUrl, imageUrls = [] }: ListingI
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={toDisplayImageUrl(activeImage)}
-                alt={name}
+                alt={`${name} photo ${activeIndex + 1}`}
                 className="h-auto w-auto max-h-[calc(100vh-2.5rem)] max-w-[calc(100vw-2.5rem)] object-contain"
                 onClick={(event) => event.stopPropagation()}
               />

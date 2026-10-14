@@ -1,8 +1,18 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { ListingModalTrigger } from "@/components/listing-modal-trigger";
+import { staticPageMetadata } from "@/lib/listing-seo";
 
 const watchTitle = "Breitling Navitimer Super 8 (Ref. EB2040 / AB2040)";
+const watchPath = "/listings/breitling-navitimer-super-8-eb2040";
+
+export const metadata: Metadata = staticPageMetadata({
+  title: "Breitling Super 8 EB2040",
+  description:
+    "Breitling Navitimer Super 8 reference EB2040 / AB2040 — 46mm instrument watch inspired by the WWII Ref. 637 cockpit timer.",
+  path: watchPath
+});
 
 const specs = [
   { label: "Case", value: "46mm diameter (about 50mm including bezel notches), 14.4mm thickness" },
