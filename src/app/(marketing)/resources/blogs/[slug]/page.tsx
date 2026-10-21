@@ -43,7 +43,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: post.title,
     description: post.summary,
-    robots: lookup.isDraftPreview ? { index: false, follow: false } : undefined,
+    robots: lookup.isDraftPreview || lookup.isScheduledPreview ? { index: false, follow: false } : undefined,
     alternates: { canonical },
     openGraph: {
       title: post.title,
@@ -70,5 +70,12 @@ export default async function BlogArticlePage({ params }: PageProps) {
   const listings = await getPublishedListings();
   const relatedListings = listingsRelatedToBlog(listings, lookup.post);
 
-  return <BlogArticle post={lookup.post} draftBanner={lookup.isDraftPreview} relatedListings={relatedListings} />;
+  return (
+    <BlogArticle
+      post={lookup.post}
+      draftBanner={lookup.isDraftPreview}
+      scheduledBanner={lookup.isScheduledPreview}
+      relatedListings={relatedListings}
+    />
+  );
 }

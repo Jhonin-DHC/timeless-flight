@@ -11,10 +11,12 @@ import type { ShopListing } from "@/lib/listing-types";
 export function BlogArticle({
   post,
   draftBanner = false,
+  scheduledBanner = false,
   relatedListings = []
 }: {
   post: PublicBlog;
   draftBanner?: boolean;
+  scheduledBanner?: boolean;
   relatedListings?: ShopListing[];
 }) {
   const showCover = Boolean(post.coverUrl) && !bodyContainsImageUrl(post.body, post.coverUrl);
@@ -27,6 +29,13 @@ export function BlogArticle({
       {draftBanner ? (
         <p className="rounded-xl border border-[var(--brand-c)]/40 bg-[var(--brand-c)]/10 px-4 py-3 text-sm text-[var(--brand-c)]">
           Draft preview — shoppers will not see this post until it is published.
+        </p>
+      ) : null}
+      {scheduledBanner ? (
+        <p className="rounded-xl border border-[var(--brand-c)]/40 bg-[var(--brand-c)]/10 px-4 py-3 text-sm text-[var(--brand-c)]">
+          Scheduled
+          {post.publishedAt ? ` — goes live ${new Date(post.publishedAt).toLocaleString()}` : ""}. Shoppers will not
+          see this post until then.
         </p>
       ) : null}
       <p className="text-sm text-[var(--muted)]">

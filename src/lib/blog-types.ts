@@ -64,6 +64,25 @@ export function isBlogStatus(value: string): value is BlogStatus {
   return (BLOG_STATUSES as readonly string[]).includes(value);
 }
 
+function publishedAtTime(value: string | Date | null | undefined) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  const time = date.getTime();
+  return Number.isNaN(time) ? null : time;
+}
+
+/** Published with a future date — hidden from shoppers until that time. */
+export function isBlogScheduled(post: { status: string; publishedAt?: string | Date | null }) {
+  if (post.status !== "published") return false;
+  const time = publishedAtTime(post.publishedAt);
+  return time !== null && time > Date.now();
+}
+
+/** Visible on the public blog index and article URL. */
+export function isBlogLive(post: { status: string; publishedAt?: string | Date | null }) {
+  return post.status === "published" && !isBlogScheduled(post);
+}
+
 export function publicBlogPath(slug: string) {
   return `/resources/blogs/${slug}`;
 }

@@ -6,6 +6,8 @@ import {
   BLOG_CATEGORY_LABELS,
   BLOG_LOCALE,
   isBlogCategory,
+  isBlogLive,
+  isBlogScheduled,
   isBlogStatus,
   publicBlogPath,
   type AdminBlog,
@@ -34,7 +36,7 @@ export interface BlogPayload {
 }
 
 export type PublicBlogLookup =
-  | { kind: "post"; post: PublicBlog; isDraftPreview: boolean }
+  | { kind: "post"; post: PublicBlog; isDraftPreview: boolean; isScheduledPreview: boolean }
   | { kind: "redirect"; slug: string }
   | { kind: "missing" };
 
@@ -331,7 +333,12 @@ export async function bulkDeleteBlogPosts(items: Array<{ slug: string; locale?: 
 export async function listPublishedBlogs(): Promise<PublicBlog[]> {
   try {
     await connectMongo();
-    const docs = await BlogPost.find({ status: "published" }).sort({ publishedAt: -1, updatedAt: -1 }).lean();
+    const docs = await BlogPost.find({
+      status: "published",
+      $or: [{ publishedAt: null }, { publishedAt: { $lte: new Date() } }]
+    })
+      .sort({ publishedAt: -1, updatedAt: -1 })
+      .lean();
     const published = docs.map((doc) => toPublicBlog(toAdminBlog(doc)));
     if (published.length === 0) return staticAsPublic();
     const slugs = new Set(published.map((post) => post.slug));
@@ -353,17 +360,23 @@ export async function resolvePublicBlog(slug: string, options?: { allowDraft?: b
     await connectMongo();
     const current = await BlogPost.findOne({ slug, locale: BLOG_LOCALE }).lean();
     if (current) {
-      if (current.status === "published") {
-        return { kind: "post", post: toPublicBlog(toAdminBlog(current)), isDraftPreview: false };
+      const scheduled = isBlogScheduled(current);
+      if (isBlogLive(current)) {
+        return { kind: "post", post: toPublicBlog(toAdminBlog(current)), isDraftPreview: false, isScheduledPreview: false };
       }
       if (allowDraft) {
-        return { kind: "post", post: toPublicBlog(toAdminBlog(current)), isDraftPreview: true };
+        return {
+          kind: "post",
+          post: toPublicBlog(toAdminBlog(current)),
+          isDraftPreview: current.status !== "published",
+          isScheduledPreview: scheduled
+        };
       }
       return { kind: "missing" };
     }
 
     const previous = await BlogPost.findOne({ previousSlugs: slug, locale: BLOG_LOCALE }).lean();
-    if (previous && (previous.status === "published" || allowDraft)) {
+    if (previous && (isBlogLive(previous) || allowDraft)) {
       return { kind: "redirect", slug: previous.slug };
     }
   } catch {
@@ -371,5 +384,7 @@ export async function resolvePublicBlog(slug: string, options?: { allowDraft?: b
   }
 
   const fallback = staticAsPublic().find((post) => post.slug === slug);
-  return fallback ? { kind: "post", post: fallback, isDraftPreview: false } : { kind: "missing" };
+  return fallback
+    ? { kind: "post", post: fallback, isDraftPreview: false, isScheduledPreview: false }
+    : { kind: "missing" };
 }

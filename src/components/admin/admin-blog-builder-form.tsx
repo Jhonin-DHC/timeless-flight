@@ -10,6 +10,7 @@ import {
   BLOG_CATEGORIES,
   BLOG_CATEGORY_LABELS,
   BLOG_LOCALE,
+  isBlogScheduled,
   publicBlogPath,
   type AdminBlog,
   type BlogCategory,
@@ -353,6 +354,15 @@ export function AdminBlogBuilderForm({ editing, onSaved, onCancel }: AdminBlogBu
               onChange={(event) => setForm({ ...form, publishedAt: event.target.value })}
               className={inputClass}
             />
+            {form.status === "published" && isBlogScheduled(form) ? (
+              <span className="block text-xs text-[var(--brand-c)]">
+                Scheduled — this post goes live automatically at this date and time. Shoppers will not see it before then.
+              </span>
+            ) : (
+              <span className="block text-xs text-[var(--muted)]">
+                Leave empty to publish immediately. A future date with status Published schedules the post.
+              </span>
+            )}
           </label>
           <label className="block space-y-1 text-sm md:col-span-2">
             <span className="text-[var(--muted)]">Summary</span>
@@ -462,7 +472,7 @@ export function AdminBlogBuilderForm({ editing, onSaved, onCancel }: AdminBlogBu
           </button>
           {form.slug ? (
             <a href={publicBlogPath(form.slug)} target="_blank" rel="noreferrer" className="text-sm text-[var(--brand-a)]">
-              {form.status === "published" ? "View live post" : "Preview draft"}
+              {isBlogScheduled(form) ? "Preview scheduled post" : form.status === "published" ? "View live post" : "Preview draft"}
             </a>
           ) : null}
           {dirty ? <span className="text-xs text-[var(--brand-c)]">Unsaved changes</span> : null}
@@ -478,7 +488,11 @@ export function AdminBlogBuilderForm({ editing, onSaved, onCancel }: AdminBlogBu
         </div>
         <div className="max-h-[min(80vh,960px)] overflow-auto rounded-2xl border border-white/10 p-4">
           <div className="pointer-events-none">
-            <BlogArticle post={previewPost} draftBanner={form.status !== "published"} />
+            <BlogArticle
+              post={previewPost}
+              draftBanner={form.status !== "published"}
+              scheduledBanner={isBlogScheduled(form)}
+            />
           </div>
         </div>
       </div>

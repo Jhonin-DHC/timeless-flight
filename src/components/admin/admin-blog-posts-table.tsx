@@ -5,6 +5,7 @@ import {
   BLOG_CATEGORIES,
   BLOG_CATEGORY_LABELS,
   BLOG_LOCALE,
+  isBlogScheduled,
   publicBlogPath,
   type AdminBlog,
   type BlogCategory,
@@ -23,7 +24,7 @@ function postKey(post: Pick<AdminBlog, "slug" | "locale">) {
 
 export function AdminBlogPostsTable({ posts, onEdit, onChanged }: AdminBlogPostsTableProps) {
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | BlogStatus>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | BlogStatus | "scheduled">("all");
   const [categoryFilter, setCategoryFilter] = useState<"all" | BlogCategory>("all");
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -36,7 +37,11 @@ export function AdminBlogPostsTable({ posts, onEdit, onChanged }: AdminBlogPosts
         needle.length === 0 ||
         post.title.toLowerCase().includes(needle) ||
         post.slug.toLowerCase().includes(needle);
-      const matchesStatus = statusFilter === "all" || post.status === statusFilter;
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "scheduled" && isBlogScheduled(post)) ||
+        (statusFilter === "published" && post.status === "published" && !isBlogScheduled(post)) ||
+        (statusFilter === "draft" && post.status === "draft");
       const matchesCategory = categoryFilter === "all" || post.category === categoryFilter;
       return matchesQuery && matchesStatus && matchesCategory;
     });
@@ -113,6 +118,7 @@ export function AdminBlogPostsTable({ posts, onEdit, onChanged }: AdminBlogPosts
         <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)} className={selectClass}>
           <option value="all">All statuses</option>
           <option value="published">Published</option>
+          <option value="scheduled">Scheduled</option>
           <option value="draft">Draft</option>
         </select>
         <select
@@ -174,7 +180,7 @@ export function AdminBlogPostsTable({ posts, onEdit, onChanged }: AdminBlogPosts
                 <td className="px-3 py-3 text-[var(--muted)]">{BLOG_CATEGORY_LABELS[post.category]}</td>
                 <td className="px-3 py-3">
                   <span className={post.status === "published" ? "text-[var(--brand-c)]" : "text-[var(--muted)]"}>
-                    {post.status}
+                    {isBlogScheduled(post) ? "scheduled" : post.status}
                   </span>
                 </td>
                 <td className="px-3 py-3 text-[var(--muted)]">
@@ -186,7 +192,7 @@ export function AdminBlogPostsTable({ posts, onEdit, onChanged }: AdminBlogPosts
                       Edit
                     </button>
                     <a href={publicBlogPath(post.slug)} target="_blank" rel="noreferrer" className="text-xs text-[var(--brand-a)]">
-                      {post.status === "published" ? "View" : "Preview"}
+                      {post.status === "published" && !isBlogScheduled(post) ? "View" : "Preview"}
                     </a>
                     <button type="button" className="text-xs text-red-300" onClick={() => void removeOne(post)}>
                       Delete
