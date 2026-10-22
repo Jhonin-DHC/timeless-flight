@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
+import { sendOrderPaidEmail } from "@/lib/email";
 import { connectMongo } from "@/lib/mongodb";
 import { getStripe } from "@/lib/stripe";
 import { AbandonedCart } from "@/models/AbandonedCart";
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
           : session.payment_intent?.id || "";
       const paidEmail = session.customer_details?.email || session.customer_email || session.metadata?.customerEmail;
 
-      await Order.findOneAndUpdate(
+      const order = await Order.findOneAndUpdate(
         { stripeSessionId: session.id },
         {
           $set: {
@@ -72,8 +73,29 @@ export async function POST(request: Request) {
             totalUsd:
               typeof session.amount_total === "number" ? session.amount_total / 100 : undefined
           }
-        }
+        },
+        { new: true }
       );
+
+      if (order && !order.purchaseEmailSentAt && order.customerEmail) {
+        try {
+          await sendOrderPaidEmail({
+            customerName: order.customerName,
+            customerEmail: order.customerEmail,
+            items: order.items,
+            subtotalUsd: order.subtotalUsd,
+            discountUsd: order.discountUsd,
+            shippingUsd: order.shippingUsd,
+            shippingLabel: order.shippingLabel,
+            shippingAddress: order.shippingAddress,
+            totalUsd: order.totalUsd,
+            couponCode: order.couponCode
+          });
+          await Order.updateOne({ _id: order._id }, { $set: { purchaseEmailSentAt: new Date() } });
+        } catch (error) {
+          console.error("Failed to send purchase confirmation email.", error);
+        }
+      }
 
       await markCartRecovered(paidEmail, session.id);
     }

@@ -3,6 +3,14 @@
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCart } from "@/components/cart-provider";
+import {
+  isUsZip,
+  quoteShipping,
+  SHIPPING_LOCAL_USD,
+  SHIPPING_OVERNIGHT_USD,
+  SHIPPING_US_USD,
+  type ShippingMethod
+} from "@/lib/shipping";
 
 interface AppliedCoupon {
   code: string;
@@ -20,11 +28,24 @@ function CheckoutContent() {
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [shippingLine1, setShippingLine1] = useState("");
+  const [shippingCity, setShippingCity] = useState("");
+  const [shippingState, setShippingState] = useState("");
+  const [shippingZip, setShippingZip] = useState("");
+  const [shippingMethod, setShippingMethod] = useState<ShippingMethod>("ground");
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const discount = appliedCoupon?.discountAmount ?? 0;
-  const total = useMemo(() => Math.max(0, subtotal - discount), [subtotal, discount]);
+  const shippingQuote = useMemo(
+    () => (isUsZip(shippingZip) ? quoteShipping(shippingZip, shippingMethod) : null),
+    [shippingZip, shippingMethod]
+  );
+  const shippingUsd = shippingQuote?.amountUsd ?? 0;
+  const total = useMemo(
+    () => Math.max(0, subtotal - discount) + shippingUsd,
+    [subtotal, discount, shippingUsd]
+  );
 
   useEffect(() => {
     if (searchParams.get("canceled") === "1") {
@@ -108,6 +129,14 @@ function CheckoutContent() {
       setErrorMessage("Name and email are required.");
       return;
     }
+    if (!shippingLine1.trim() || !shippingCity.trim() || !/^[A-Za-z]{2}$/.test(shippingState.trim())) {
+      setErrorMessage("Enter a US shipping address (street, city, and 2-letter state).");
+      return;
+    }
+    if (!isUsZip(shippingZip)) {
+      setErrorMessage("Enter a 5-digit US ZIP so we can quote shipping.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -119,7 +148,12 @@ function CheckoutContent() {
           customerEmail,
           customerName,
           referralEmail: referralEmail || undefined,
-          couponCode: appliedCoupon?.code
+          couponCode: appliedCoupon?.code,
+          shippingLine1: shippingLine1.trim(),
+          shippingCity: shippingCity.trim(),
+          shippingState: shippingState.trim().toUpperCase(),
+          shippingZip,
+          shippingMethod
         })
       });
       const payload = await response.json();
@@ -139,8 +173,8 @@ function CheckoutContent() {
     <section className="space-y-6">
       <h1 className="section-title">Checkout</h1>
       <p className="section-copy max-w-3xl">
-        Review your cart and continue to secure Stripe payment. Coupons are validated before payment; final totals are
-        confirmed by Stripe.
+        Review your cart and continue to secure Stripe payment. We ship inside the US only from Plano, TX. Coupons apply
+        to the watch subtotal, not shipping.
       </p>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
@@ -206,6 +240,72 @@ function CheckoutContent() {
             className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm outline-none ring-[var(--brand-a)] focus:ring-2"
           />
 
+          <div className="space-y-3 rounded-xl border border-white/15 p-3">
+            <h3 className="text-sm font-medium">US shipping address</h3>
+            <input
+              value={shippingLine1}
+              onChange={(event) => setShippingLine1(event.target.value)}
+              placeholder="Street address"
+              autoComplete="shipping address-line1"
+              className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm outline-none ring-[var(--brand-a)] focus:ring-2"
+            />
+            <div className="grid gap-2 sm:grid-cols-[1fr_5rem_6.5rem]">
+              <input
+                value={shippingCity}
+                onChange={(event) => setShippingCity(event.target.value)}
+                placeholder="City"
+                autoComplete="shipping address-level2"
+                className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm outline-none ring-[var(--brand-a)] focus:ring-2"
+              />
+              <input
+                value={shippingState}
+                onChange={(event) => setShippingState(event.target.value.toUpperCase().slice(0, 2))}
+                placeholder="TX"
+                autoComplete="shipping address-level1"
+                maxLength={2}
+                className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm uppercase outline-none ring-[var(--brand-a)] focus:ring-2"
+              />
+              <input
+                value={shippingZip}
+                onChange={(event) => setShippingZip(event.target.value.replace(/\D/g, "").slice(0, 5))}
+                placeholder="ZIP"
+                inputMode="numeric"
+                autoComplete="shipping postal-code"
+                className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm outline-none ring-[var(--brand-a)] focus:ring-2"
+              />
+            </div>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Shipping method</legend>
+              <label className="flex cursor-pointer items-start gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="shippingMethod"
+                  checked={shippingMethod === "ground"}
+                  onChange={() => setShippingMethod("ground")}
+                  className="mt-1"
+                />
+                <span>
+                  Insured ground — ${SHIPPING_LOCAL_USD} Plano / DFW, ${SHIPPING_US_USD} rest of US
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="shippingMethod"
+                  checked={shippingMethod === "overnight"}
+                  onChange={() => setShippingMethod("overnight")}
+                  className="mt-1"
+                />
+                <span>Overnight insured — ${SHIPPING_OVERNIGHT_USD} anywhere in the US</span>
+              </label>
+            </fieldset>
+            {shippingQuote ? (
+              <p className="text-xs text-[var(--muted)]">{shippingQuote.label}</p>
+            ) : (
+              <p className="text-xs text-[var(--muted)]">Enter a ZIP to see the exact shipping fee.</p>
+            )}
+          </div>
+
           <div className="rounded-xl border border-white/15 p-3">
             <label htmlFor="coupon-code" className="mb-2 block text-sm font-medium">
               Coupon code
@@ -244,6 +344,10 @@ function CheckoutContent() {
                 Discount{appliedCoupon?.percentOff ? ` (${appliedCoupon.percentOff}%)` : ""}
               </span>
               <span>- ${discount.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[var(--muted)]">Shipping</span>
+              <span>{shippingQuote ? `$${shippingUsd.toLocaleString()}` : "Enter ZIP"}</span>
             </div>
             <div className="flex justify-between border-t border-white/15 pt-2 text-base font-semibold">
               <span>Total</span>

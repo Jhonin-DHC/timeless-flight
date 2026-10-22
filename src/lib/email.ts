@@ -1,4 +1,6 @@
 import nodemailer from "nodemailer";
+import { SITE_NAME, SITE_PHONE_DISPLAY } from "@/lib/site";
+import { SHIPPING_CARRIER_LABELS, trackingUrl, type ShippingCarrier } from "@/lib/shipping";
 
 export function isEmailConfigured() {
   return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
@@ -104,6 +106,140 @@ export async function sendSellInquiryAlert(inquiry: {
     subject,
     text,
     replyTo: inquiry.email
+  });
+}
+
+type OrderMailItem = {
+  name: string;
+  priceUsd: number;
+  quantity: number;
+};
+
+type OrderMailAddress = {
+  line1?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+};
+
+export type OrderMailPayload = {
+  customerName?: string;
+  customerEmail: string;
+  items: OrderMailItem[];
+  subtotalUsd: number;
+  discountUsd?: number;
+  shippingUsd?: number;
+  shippingLabel?: string;
+  shippingAddress?: OrderMailAddress;
+  totalUsd: number;
+  couponCode?: string;
+  carrier?: string;
+  trackingNumber?: string;
+};
+
+function money(amount: number) {
+  return `$${Number(amount || 0).toLocaleString()}`;
+}
+
+function formatAddress(address?: OrderMailAddress) {
+  if (!address?.line1) return "";
+  const cityLine = [address.city, address.state, address.postalCode].filter(Boolean).join(" ");
+  return [address.line1, cityLine, address.country || "US"].filter(Boolean).join("\n");
+}
+
+function orderItemsText(items: OrderMailItem[]) {
+  return items
+    .map((item) => `${item.quantity} × ${item.name} — ${money(item.priceUsd)}`)
+    .join("\n");
+}
+
+export async function sendOrderPaidEmail(order: OrderMailPayload) {
+  if (!isEmailConfigured() || !order.customerEmail) return;
+
+  const address = formatAddress(order.shippingAddress);
+  const subject = `Order confirmed — ${SITE_NAME}`;
+  const text = [
+    `Thank you${order.customerName ? `, ${order.customerName}` : ""} for your purchase from ${SITE_NAME}.`,
+    "",
+    "Items:",
+    orderItemsText(order.items),
+    "",
+    `Subtotal: ${money(order.subtotalUsd)}`,
+    order.discountUsd ? `Discount${order.couponCode ? ` (${order.couponCode})` : ""}: -${money(order.discountUsd)}` : "",
+    `Shipping${order.shippingLabel ? ` (${order.shippingLabel})` : ""}: ${money(order.shippingUsd || 0)}`,
+    `Total: ${money(order.totalUsd)}`,
+    "",
+    address ? `Ship to:\n${address}` : "",
+    "",
+    "We will email tracking as soon as your watch ships.",
+    `Questions: ${SITE_PHONE_DISPLAY}`
+  ]
+    .filter((line, index, lines) => !(line === "" && lines[index - 1] === ""))
+    .join("\n")
+    .trim();
+
+  await sendEmail({
+    to: order.customerEmail,
+    subject,
+    text,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111;">
+        <p>Thank you${order.customerName ? `, ${order.customerName}` : ""} for your purchase from ${SITE_NAME}.</p>
+        <p><strong>Items</strong><br />${orderItemsText(order.items).replace(/\n/g, "<br />")}</p>
+        <p>
+          Subtotal: ${money(order.subtotalUsd)}<br />
+          ${order.discountUsd ? `Discount${order.couponCode ? ` (${order.couponCode})` : ""}: -${money(order.discountUsd)}<br />` : ""}
+          Shipping${order.shippingLabel ? ` (${order.shippingLabel})` : ""}: ${money(order.shippingUsd || 0)}<br />
+          <strong>Total: ${money(order.totalUsd)}</strong>
+        </p>
+        ${address ? `<p><strong>Ship to</strong><br />${address.replace(/\n/g, "<br />")}</p>` : ""}
+        <p>We will email tracking as soon as your watch ships.</p>
+        <p style="color:#666;">Questions: ${SITE_PHONE_DISPLAY}</p>
+      </div>
+    `
+  });
+}
+
+export async function sendOrderShippedEmail(order: OrderMailPayload) {
+  if (!isEmailConfigured() || !order.customerEmail || !order.trackingNumber) return;
+
+  const carrierKey = (order.carrier || "ups").toLowerCase();
+  const carrierLabel = SHIPPING_CARRIER_LABELS[carrierKey as ShippingCarrier] || "UPS";
+  const url = trackingUrl(carrierKey, order.trackingNumber);
+  const address = formatAddress(order.shippingAddress);
+  const subject = `Your watch has shipped — ${SITE_NAME}`;
+  const text = [
+    `Good news${order.customerName ? `, ${order.customerName}` : ""} — your order from ${SITE_NAME} is on the way.`,
+    "",
+    `Carrier: ${carrierLabel}`,
+    `Tracking: ${order.trackingNumber}`,
+    url ? `Track: ${url}` : "",
+    "",
+    address ? `Ship to:\n${address}` : "",
+    "",
+    `Questions: ${SITE_PHONE_DISPLAY}`
+  ]
+    .filter((line, index, lines) => !(line === "" && lines[index - 1] === ""))
+    .join("\n")
+    .trim();
+
+  await sendEmail({
+    to: order.customerEmail,
+    subject,
+    text,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111;">
+        <p>Good news${order.customerName ? `, ${order.customerName}` : ""} — your order from ${SITE_NAME} is on the way.</p>
+        <p>
+          <strong>Carrier:</strong> ${carrierLabel}<br />
+          <strong>Tracking:</strong> ${order.trackingNumber}
+        </p>
+        ${url ? `<p><a href="${url}">Track your shipment</a></p>` : ""}
+        ${address ? `<p><strong>Ship to</strong><br />${address.replace(/\n/g, "<br />")}</p>` : ""}
+        <p style="color:#666;">Questions: ${SITE_PHONE_DISPLAY}</p>
+      </div>
+    `
   });
 }
 

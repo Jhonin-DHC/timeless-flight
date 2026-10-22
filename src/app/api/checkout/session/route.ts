@@ -39,6 +39,8 @@ export async function GET(request: Request) {
             items: order.items,
             subtotalUsd: order.subtotalUsd,
             discountUsd: order.discountUsd,
+            shippingUsd: order.shippingUsd || 0,
+            shippingLabel: order.shippingLabel || "",
             totalUsd: order.totalUsd,
             paidAt: order.paidAt
           }

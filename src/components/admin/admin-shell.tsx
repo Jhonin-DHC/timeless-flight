@@ -11,6 +11,7 @@ const navItems = [
   { href: "/admin/blogs", label: "Blogs" },
   { href: "/admin/search", label: "Search" },
   { href: "/admin/sell-inquiries", label: "Sell inquiries" },
+  { href: "/admin/orders", label: "Orders" },
   { href: "/admin/abandoned-carts", label: "Abandoned carts" },
   { href: "/admin/settings", label: "Settings" }
 ];

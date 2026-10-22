@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { connectMongo } from "@/lib/mongodb";
+import {
+  isShippingMethod,
+  isUsZip,
+  normalizeUsZip,
+  quoteShipping
+} from "@/lib/shipping";
 import { dollarsToCents, getSiteUrl, getStripe, isStripeConfigured } from "@/lib/stripe";
 import { AbandonedCart } from "@/models/AbandonedCart";
 import { Order } from "@/models/Order";
@@ -56,10 +62,28 @@ export async function POST(request: Request) {
     const customerName = typeof body.customerName === "string" ? body.customerName.trim() : "";
     const referralEmail = typeof body.referralEmail === "string" ? body.referralEmail.trim() : "";
     const couponCode = typeof body.couponCode === "string" ? body.couponCode.trim().toUpperCase() : "";
+    const shippingLine1 = typeof body.shippingLine1 === "string" ? body.shippingLine1.trim() : "";
+    const shippingCity = typeof body.shippingCity === "string" ? body.shippingCity.trim() : "";
+    const shippingState =
+      typeof body.shippingState === "string" ? body.shippingState.trim().toUpperCase() : "";
+    const shippingPostalCode = normalizeUsZip(
+      typeof body.shippingZip === "string" ? body.shippingZip : ""
+    );
+    const shippingMethodRaw = String(body.shippingMethod || "");
+    const shippingMethod = isShippingMethod(shippingMethodRaw) ? shippingMethodRaw : "";
     const items = Array.isArray(body.items) ? (body.items as CheckoutItem[]) : [];
 
     if (!customerEmail || !customerName) {
       return NextResponse.json({ error: "Name and email are required." }, { status: 400 });
+    }
+    if (!shippingLine1 || !shippingCity || !/^[A-Z]{2}$/.test(shippingState) || !isUsZip(shippingPostalCode)) {
+      return NextResponse.json(
+        { error: "US shipping address is required (street, city, 2-letter state, 5-digit ZIP)." },
+        { status: 400 }
+      );
+    }
+    if (!shippingMethod) {
+      return NextResponse.json({ error: "Choose ground or overnight shipping." }, { status: 400 });
     }
     if (items.length === 0) {
       return NextResponse.json({ error: "Cart is empty." }, { status: 400 });
@@ -102,7 +126,9 @@ export async function POST(request: Request) {
       }
     }
 
-    const totalUsd = Math.max(0, Math.round((subtotalUsd - discountUsd) * 100) / 100);
+    const shipping = quoteShipping(shippingPostalCode, shippingMethod);
+    const merchandiseUsd = Math.max(0, Math.round((subtotalUsd - discountUsd) * 100) / 100);
+    const totalUsd = Math.round((merchandiseUsd + shipping.amountUsd) * 100) / 100;
     // Stripe allows $0 when a 100% coupon applies; otherwise enforce the $0.50 floor.
     if (totalUsd > 0 && totalUsd < 0.5) {
       return NextResponse.json({ error: "Order total must be at least $0.50 for Stripe Checkout." }, { status: 400 });
@@ -128,13 +154,36 @@ export async function POST(request: Request) {
       })),
       success_url: `${siteUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/checkout?canceled=1`,
+      shipping_options: [
+        {
+          shipping_rate_data: {
+            type: "fixed_amount",
+            display_name: shipping.label,
+            fixed_amount: { amount: dollarsToCents(shipping.amountUsd), currency: "usd" },
+            delivery_estimate:
+              shippingMethod === "overnight"
+                ? {
+                    minimum: { unit: "business_day", value: 1 },
+                    maximum: { unit: "business_day", value: 1 }
+                  }
+                : {
+                    minimum: { unit: "business_day", value: 3 },
+                    maximum: { unit: "business_day", value: 7 }
+                  }
+          }
+        }
+      ],
       metadata: {
         customerName,
         customerEmail,
         referralEmail,
         couponCode,
         discountUsd: String(discountUsd),
-        percentOff: String(percentOff)
+        percentOff: String(percentOff),
+        shippingUsd: String(shipping.amountUsd),
+        shippingMethod,
+        shippingZone: shipping.zone,
+        shippingZip: shippingPostalCode
       },
       payment_intent_data: {
         metadata: {
@@ -165,6 +214,17 @@ export async function POST(request: Request) {
       couponCode,
       discountUsd,
       subtotalUsd,
+      shippingUsd: shipping.amountUsd,
+      shippingMethod,
+      shippingZone: shipping.zone,
+      shippingLabel: shipping.label,
+      shippingAddress: {
+        line1: shippingLine1,
+        city: shippingCity,
+        state: shippingState,
+        postalCode: shippingPostalCode,
+        country: "US"
+      },
       totalUsd,
       currency: "usd",
       status: "pending",

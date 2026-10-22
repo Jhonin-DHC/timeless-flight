@@ -11,6 +11,17 @@ const OrderItemSchema = new Schema(
   { _id: false }
 );
 
+const ShippingAddressSchema = new Schema(
+  {
+    line1: { type: String, default: "" },
+    city: { type: String, default: "" },
+    state: { type: String, default: "" },
+    postalCode: { type: String, default: "" },
+    country: { type: String, default: "US" }
+  },
+  { _id: false }
+);
+
 const OrderSchema = new Schema(
   {
     stripeSessionId: { type: String, required: true, unique: true, index: true },
@@ -21,6 +32,11 @@ const OrderSchema = new Schema(
     couponCode: { type: String, default: "" },
     discountUsd: { type: Number, default: 0 },
     subtotalUsd: { type: Number, required: true },
+    shippingUsd: { type: Number, default: 0 },
+    shippingMethod: { type: String, enum: ["ground", "overnight", ""], default: "" },
+    shippingZone: { type: String, enum: ["local", "us", ""], default: "" },
+    shippingLabel: { type: String, default: "" },
+    shippingAddress: { type: ShippingAddressSchema, default: () => ({}) },
     totalUsd: { type: Number, required: true },
     currency: { type: String, default: "usd" },
     status: {
@@ -30,7 +46,12 @@ const OrderSchema = new Schema(
       index: true
     },
     items: { type: [OrderItemSchema], default: [] },
-    paidAt: { type: Date }
+    paidAt: { type: Date },
+    carrier: { type: String, enum: ["ups", "fedex", ""], default: "" },
+    trackingNumber: { type: String, default: "" },
+    shippedAt: { type: Date, default: null },
+    purchaseEmailSentAt: { type: Date, default: null },
+    shippingEmailSentAt: { type: Date, default: null }
   },
   { timestamps: true }
 );
