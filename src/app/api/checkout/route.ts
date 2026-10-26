@@ -126,7 +126,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const shipping = quoteShipping(shippingPostalCode, shippingMethod);
+    const shipping = quoteShipping(shippingPostalCode, shippingMethod, percentOff);
     const merchandiseUsd = Math.max(0, Math.round((subtotalUsd - discountUsd) * 100) / 100);
     const totalUsd = Math.round((merchandiseUsd + shipping.amountUsd) * 100) / 100;
     // Stripe allows $0 when a 100% coupon applies; otherwise enforce the $0.50 floor.
@@ -185,14 +185,18 @@ export async function POST(request: Request) {
         shippingZone: shipping.zone,
         shippingZip: shippingPostalCode
       },
-      payment_intent_data: {
+    };
+
+    // $0 Checkout Sessions do not create a PaymentIntent.
+    if (totalUsd > 0) {
+      sessionParams.payment_intent_data = {
         metadata: {
           customerName,
           customerEmail,
           couponCode
         }
-      }
-    };
+      };
+    }
 
     if (promotionCodeId) {
       sessionParams.discounts = [{ promotion_code: promotionCodeId }];

@@ -38,26 +38,37 @@ export function isShippingCarrier(value: string): value is ShippingCarrier {
   return (SHIPPING_CARRIERS as readonly string[]).includes(value);
 }
 
-export function quoteShipping(zip: string, method: ShippingMethod) {
+export function isComplimentaryShipping(percentOff: number) {
+  return percentOff >= 100;
+}
+
+export function quoteShipping(zip: string, method: ShippingMethod, percentOff = 0) {
   const local = isLocalPlanoShippingZip(zip);
-  if (method === "overnight") {
-    return {
-      amountUsd: SHIPPING_OVERNIGHT_USD,
-      zone: local ? ("local" as const) : ("us" as const),
-      label: "Overnight insured shipping (US)"
-    };
-  }
-  if (local) {
-    return {
-      amountUsd: SHIPPING_LOCAL_USD,
-      zone: "local" as const,
-      label: "Insured ground — Plano / DFW"
-    };
-  }
+  const quoted =
+    method === "overnight"
+      ? {
+          amountUsd: SHIPPING_OVERNIGHT_USD,
+          zone: local ? ("local" as const) : ("us" as const),
+          label: "Overnight insured shipping (US)"
+        }
+      : local
+        ? {
+            amountUsd: SHIPPING_LOCAL_USD,
+            zone: "local" as const,
+            label: "Insured ground — Plano / DFW"
+          }
+        : {
+            amountUsd: SHIPPING_US_USD,
+            zone: "us" as const,
+            label: "Insured ground — rest of US"
+          };
+
+  if (!isComplimentaryShipping(percentOff)) return quoted;
+
   return {
-    amountUsd: SHIPPING_US_USD,
-    zone: "us" as const,
-    label: "Insured ground — rest of US"
+    ...quoted,
+    amountUsd: 0,
+    label: "Free shipping"
   };
 }
 

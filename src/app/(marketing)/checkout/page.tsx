@@ -4,6 +4,7 @@ import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCart } from "@/components/cart-provider";
 import {
+  isComplimentaryShipping,
   isUsZip,
   quoteShipping,
   SHIPPING_LOCAL_USD,
@@ -37,11 +38,15 @@ function CheckoutContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const discount = appliedCoupon?.discountAmount ?? 0;
+  const complimentaryShipping = isComplimentaryShipping(appliedCoupon?.percentOff ?? 0);
   const shippingQuote = useMemo(
-    () => (isUsZip(shippingZip) ? quoteShipping(shippingZip, shippingMethod) : null),
-    [shippingZip, shippingMethod]
+    () =>
+      isUsZip(shippingZip)
+        ? quoteShipping(shippingZip, shippingMethod, appliedCoupon?.percentOff ?? 0)
+        : null,
+    [shippingZip, shippingMethod, appliedCoupon?.percentOff]
   );
-  const shippingUsd = shippingQuote?.amountUsd ?? 0;
+  const shippingUsd = complimentaryShipping ? 0 : (shippingQuote?.amountUsd ?? 0);
   const total = useMemo(
     () => Math.max(0, subtotal - discount) + shippingUsd,
     [subtotal, discount, shippingUsd]
@@ -103,6 +108,9 @@ function CheckoutContent() {
         percentOff: typeof result.percentOff === "number" ? result.percentOff : undefined
       });
       setCouponInput(result.code);
+      if (typeof result.message === "string" && result.message) {
+        setInfoMessage(result.message);
+      }
     } catch (error) {
       setAppliedCoupon(null);
       setErrorMessage(error instanceof Error ? error.message : "Failed to validate coupon.");
@@ -173,8 +181,8 @@ function CheckoutContent() {
     <section className="space-y-6">
       <h1 className="section-title">Checkout</h1>
       <p className="section-copy max-w-3xl">
-        Review your cart and continue to secure Stripe payment. We ship inside the US only from Plano, TX. Coupons apply
-        to the watch subtotal, not shipping.
+        Review your cart and continue to secure Stripe payment. We ship inside the US only from Plano, TX. Percent
+        coupons apply to the watch subtotal; a 100% code also covers shipping.
       </p>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
@@ -299,7 +307,9 @@ function CheckoutContent() {
                 <span>Overnight insured — ${SHIPPING_OVERNIGHT_USD} anywhere in the US</span>
               </label>
             </fieldset>
-            {shippingQuote ? (
+            {complimentaryShipping ? (
+              <p className="text-xs text-[var(--muted)]">100% coupon includes free shipping.</p>
+            ) : shippingQuote ? (
               <p className="text-xs text-[var(--muted)]">{shippingQuote.label}</p>
             ) : (
               <p className="text-xs text-[var(--muted)]">Enter a ZIP to see the exact shipping fee.</p>
@@ -347,7 +357,13 @@ function CheckoutContent() {
             </div>
             <div className="flex justify-between">
               <span className="text-[var(--muted)]">Shipping</span>
-              <span>{shippingQuote ? `$${shippingUsd.toLocaleString()}` : "Enter ZIP"}</span>
+              <span>
+                {complimentaryShipping
+                  ? "Free"
+                  : shippingQuote
+                    ? `$${shippingUsd.toLocaleString()}`
+                    : "Enter ZIP"}
+              </span>
             </div>
             <div className="flex justify-between border-t border-white/15 pt-2 text-base font-semibold">
               <span>Total</span>

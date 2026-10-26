@@ -58,7 +58,12 @@ export async function POST(request: Request) {
       promotionCodeId: promo.id,
       percentOff,
       discountAmount,
-      message: percentOff > 0 ? `${percentOff}% off applied.` : "Discount applied."
+      message:
+        percentOff >= 100
+          ? "100% off applied, including shipping."
+          : percentOff > 0
+            ? `${percentOff}% off applied.`
+            : "Discount applied."
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to validate coupon.";
