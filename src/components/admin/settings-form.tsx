@@ -8,6 +8,10 @@ interface SettingsPayload {
   shippingLocalUsd: number;
   shippingUsUsd: number;
   shippingOvernightUsd: number;
+  insuranceMinUsd: number;
+  insurancePercent: number;
+  insurancePercentAboveUsd: number;
+  insuranceApplyAboveUsd: number;
   ebayConfigured: boolean;
   ebayEnv?: "sandbox" | "production";
   mongoConfigured: boolean;
@@ -36,7 +40,11 @@ export function SettingsForm() {
         searchRunsPerDay: settings.searchRunsPerDay,
         shippingLocalUsd: settings.shippingLocalUsd,
         shippingUsUsd: settings.shippingUsUsd,
-        shippingOvernightUsd: settings.shippingOvernightUsd
+        shippingOvernightUsd: settings.shippingOvernightUsd,
+        insuranceMinUsd: settings.insuranceMinUsd,
+        insurancePercent: settings.insurancePercent,
+        insurancePercentAboveUsd: settings.insurancePercentAboveUsd,
+        insuranceApplyAboveUsd: settings.insuranceApplyAboveUsd
       })
     });
     setMessage(response.ok ? "Settings saved." : "Failed to save settings.");
@@ -72,8 +80,8 @@ export function SettingsForm() {
         <div className="space-y-3 border-t border-white/10 pt-4">
           <h3 className="text-sm font-medium">US shipping fees</h3>
           <p className="text-xs text-[var(--muted)]">
-            Checkout uses these amounts immediately. A 100% coupon still waives shipping; other percent codes apply to
-            the watch subtotal only.
+            Checkout uses these amounts immediately. A 100% coupon still waives shipping and insurance; other percent
+            codes apply to the watch subtotal only.
           </p>
           <div className="grid gap-3 md:grid-cols-3">
             <label className="space-y-1 text-xs text-[var(--muted)]">
@@ -109,6 +117,63 @@ export function SettingsForm() {
                 value={settings.shippingOvernightUsd}
                 onChange={(event) =>
                   setSettings({ ...settings, shippingOvernightUsd: Number(event.target.value) })
+                }
+                className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm text-white"
+              />
+            </label>
+          </div>
+        </div>
+        <div className="space-y-3 border-t border-white/10 pt-4">
+          <h3 className="text-sm font-medium">Shipping insurance</h3>
+          <p className="text-xs text-[var(--muted)]">
+            Charged as a separate checkout line when the watch subtotal is over the threshold. Defaults follow Secursus:
+            $2 minimum, then 1% of declared value above $715.
+          </p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="space-y-1 text-xs text-[var(--muted)]">
+              Apply when subtotal is over ($)
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={settings.insuranceApplyAboveUsd}
+                onChange={(event) =>
+                  setSettings({ ...settings, insuranceApplyAboveUsd: Number(event.target.value) })
+                }
+                className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm text-white"
+              />
+            </label>
+            <label className="space-y-1 text-xs text-[var(--muted)]">
+              Minimum premium ($)
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={settings.insuranceMinUsd}
+                onChange={(event) => setSettings({ ...settings, insuranceMinUsd: Number(event.target.value) })}
+                className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm text-white"
+              />
+            </label>
+            <label className="space-y-1 text-xs text-[var(--muted)]">
+              Percent of value
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={settings.insurancePercent}
+                onChange={(event) => setSettings({ ...settings, insurancePercent: Number(event.target.value) })}
+                className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm text-white"
+              />
+            </label>
+            <label className="space-y-1 text-xs text-[var(--muted)]">
+              Percent starts above ($)
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={settings.insurancePercentAboveUsd}
+                onChange={(event) =>
+                  setSettings({ ...settings, insurancePercentAboveUsd: Number(event.target.value) })
                 }
                 className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm text-white"
               />

@@ -60,7 +60,7 @@ export async function POST(request: Request) {
       discountAmount,
       message:
         percentOff >= 100
-          ? "100% off applied, including shipping."
+          ? "100% off applied, including shipping and insurance."
           : percentOff > 0
             ? `${percentOff}% off applied.`
             : "Discount applied."

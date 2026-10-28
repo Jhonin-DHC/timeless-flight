@@ -3,8 +3,13 @@ import { getEbayConfigStatus } from "@/lib/ebay";
 import { getTeamNotifyEmails, isEmailConfigured } from "@/lib/email";
 import { connectMongo } from "@/lib/mongodb";
 import { isR2Configured } from "@/lib/r2";
-import { normalizeShippingRate } from "@/lib/shipping";
-import { getShippingRates, saveShippingRates } from "@/lib/shipping-settings";
+import { normalizeInsuranceSettings, normalizeShippingRate } from "@/lib/shipping";
+import {
+  getInsuranceSettings,
+  getShippingRates,
+  saveInsuranceSettings,
+  saveShippingRates
+} from "@/lib/shipping-settings";
 import { getSetting, setSetting } from "@/models/AppSettings";
 
 export async function GET() {
@@ -13,6 +18,7 @@ export async function GET() {
     const marketplaceId = await getSetting("marketplaceId", process.env.EBAY_MARKETPLACE_ID ?? "EBAY_US");
     const searchRunsPerDay = await getSetting("searchRunsPerDay", 3);
     const shippingRates = await getShippingRates();
+    const insurance = await getInsuranceSettings();
     const ebay = getEbayConfigStatus();
     return NextResponse.json({
       settings: {
@@ -21,6 +27,10 @@ export async function GET() {
         shippingLocalUsd: shippingRates.localUsd,
         shippingUsUsd: shippingRates.usUsd,
         shippingOvernightUsd: shippingRates.overnightUsd,
+        insuranceMinUsd: insurance.minUsd,
+        insurancePercent: insurance.percent,
+        insurancePercentAboveUsd: insurance.percentAboveUsd,
+        insuranceApplyAboveUsd: insurance.applyAboveUsd,
         ebayConfigured: ebay.configured,
         ebayEnv: ebay.env,
         mongoConfigured: Boolean(process.env.MONGODB_URI),
@@ -52,6 +62,22 @@ export async function PUT(request: Request) {
         usUsd: normalizeShippingRate(body.shippingUsUsd, current.usUsd),
         overnightUsd: normalizeShippingRate(body.shippingOvernightUsd, current.overnightUsd)
       });
+    }
+    if (
+      body.insuranceMinUsd !== undefined ||
+      body.insurancePercent !== undefined ||
+      body.insurancePercentAboveUsd !== undefined ||
+      body.insuranceApplyAboveUsd !== undefined
+    ) {
+      const current = await getInsuranceSettings();
+      await saveInsuranceSettings(
+        normalizeInsuranceSettings({
+          minUsd: normalizeShippingRate(body.insuranceMinUsd, current.minUsd),
+          percent: normalizeShippingRate(body.insurancePercent, current.percent),
+          percentAboveUsd: normalizeShippingRate(body.insurancePercentAboveUsd, current.percentAboveUsd),
+          applyAboveUsd: normalizeShippingRate(body.insuranceApplyAboveUsd, current.applyAboveUsd)
+        })
+      );
     }
     return NextResponse.json({ ok: true });
   } catch (error) {

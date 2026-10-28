@@ -4,9 +4,10 @@ import {
   isShippingMethod,
   isUsZip,
   normalizeUsZip,
+  quoteInsurance,
   quoteShipping
 } from "@/lib/shipping";
-import { getShippingRates } from "@/lib/shipping-settings";
+import { getInsuranceSettings, getShippingRates } from "@/lib/shipping-settings";
 import { dollarsToCents, getSiteUrl, getStripe, isStripeConfigured } from "@/lib/stripe";
 import { AbandonedCart } from "@/models/AbandonedCart";
 import { Order } from "@/models/Order";
@@ -128,9 +129,11 @@ export async function POST(request: Request) {
     }
 
     const shippingRates = await getShippingRates();
+    const insuranceSettings = await getInsuranceSettings();
     const shipping = quoteShipping(shippingPostalCode, shippingMethod, percentOff, shippingRates);
+    const insurance = quoteInsurance(subtotalUsd, percentOff, insuranceSettings);
     const merchandiseUsd = Math.max(0, Math.round((subtotalUsd - discountUsd) * 100) / 100);
-    const totalUsd = Math.round((merchandiseUsd + shipping.amountUsd) * 100) / 100;
+    const totalUsd = Math.round((merchandiseUsd + shipping.amountUsd + insurance.amountUsd) * 100) / 100;
     // Stripe allows $0 when a 100% coupon applies; otherwise enforce the $0.50 floor.
     if (totalUsd > 0 && totalUsd < 0.5) {
       return NextResponse.json({ error: "Order total must be at least $0.50 for Stripe Checkout." }, { status: 400 });
@@ -160,8 +163,11 @@ export async function POST(request: Request) {
         {
           shipping_rate_data: {
             type: "fixed_amount",
-            display_name: shipping.label,
-            fixed_amount: { amount: dollarsToCents(shipping.amountUsd), currency: "usd" },
+            display_name: insurance.amountUsd > 0 ? `${shipping.label} + insurance` : shipping.label,
+            fixed_amount: {
+              amount: dollarsToCents(shipping.amountUsd + insurance.amountUsd),
+              currency: "usd"
+            },
             delivery_estimate:
               shippingMethod === "overnight"
                 ? {
@@ -183,6 +189,7 @@ export async function POST(request: Request) {
         discountUsd: String(discountUsd),
         percentOff: String(percentOff),
         shippingUsd: String(shipping.amountUsd),
+        insuranceUsd: String(insurance.amountUsd),
         shippingMethod,
         shippingZone: shipping.zone,
         shippingZip: shippingPostalCode
@@ -221,6 +228,8 @@ export async function POST(request: Request) {
       discountUsd,
       subtotalUsd,
       shippingUsd: shipping.amountUsd,
+      insuranceUsd: insurance.amountUsd,
+      insuranceLabel: insurance.label,
       shippingMethod,
       shippingZone: shipping.zone,
       shippingLabel: shipping.label,

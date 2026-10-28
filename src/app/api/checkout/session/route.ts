@@ -41,6 +41,8 @@ export async function GET(request: Request) {
             discountUsd: order.discountUsd,
             shippingUsd: order.shippingUsd || 0,
             shippingLabel: order.shippingLabel || "",
+            insuranceUsd: order.insuranceUsd || 0,
+            insuranceLabel: order.insuranceLabel || "",
             totalUsd: order.totalUsd,
             paidAt: order.paidAt
           }

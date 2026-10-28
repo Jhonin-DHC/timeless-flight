@@ -4,10 +4,13 @@ import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCart } from "@/components/cart-provider";
 import {
+  DEFAULT_INSURANCE_SETTINGS,
   DEFAULT_SHIPPING_RATES,
   isComplimentaryShipping,
   isUsZip,
+  quoteInsurance,
   quoteShipping,
+  type InsuranceSettings,
   type ShippingMethod,
   type ShippingRates
 } from "@/lib/shipping";
@@ -36,6 +39,7 @@ function CheckoutContent() {
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [shippingRates, setShippingRates] = useState<ShippingRates>(DEFAULT_SHIPPING_RATES);
+  const [insuranceSettings, setInsuranceSettings] = useState<InsuranceSettings>(DEFAULT_INSURANCE_SETTINGS);
 
   const discount = appliedCoupon?.discountAmount ?? 0;
   const complimentaryShipping = isComplimentaryShipping(appliedCoupon?.percentOff ?? 0);
@@ -46,10 +50,15 @@ function CheckoutContent() {
         : null,
     [shippingZip, shippingMethod, appliedCoupon?.percentOff, shippingRates]
   );
+  const insuranceQuote = useMemo(
+    () => quoteInsurance(subtotal, appliedCoupon?.percentOff ?? 0, insuranceSettings),
+    [subtotal, appliedCoupon?.percentOff, insuranceSettings]
+  );
   const shippingUsd = complimentaryShipping ? 0 : (shippingQuote?.amountUsd ?? 0);
+  const insuranceUsd = complimentaryShipping ? 0 : insuranceQuote.amountUsd;
   const total = useMemo(
-    () => Math.max(0, subtotal - discount) + shippingUsd,
-    [subtotal, discount, shippingUsd]
+    () => Math.max(0, subtotal - discount) + shippingUsd + insuranceUsd,
+    [subtotal, discount, shippingUsd, insuranceUsd]
   );
 
   useEffect(() => {
@@ -63,6 +72,7 @@ function CheckoutContent() {
       .then((response) => response.json())
       .then((payload) => {
         if (payload?.rates) setShippingRates(payload.rates);
+        if (payload?.insuranceSettings) setInsuranceSettings(payload.insuranceSettings);
       })
       .catch(() => {
         // Fall back to default rates if the live quote cannot load.
@@ -126,6 +136,7 @@ function CheckoutContent() {
         .then((shippingResponse) => shippingResponse.json())
         .then((payload) => {
           if (payload?.rates) setShippingRates(payload.rates);
+          if (payload?.insuranceSettings) setInsuranceSettings(payload.insuranceSettings);
         })
         .catch(() => undefined);
     } catch (error) {
@@ -199,7 +210,7 @@ function CheckoutContent() {
       <h1 className="section-title">Checkout</h1>
       <p className="section-copy max-w-3xl">
         Review your cart and continue to secure Stripe payment. We ship inside the US only from Plano, TX. Percent
-        coupons apply to the watch subtotal; a 100% code also covers shipping.
+        coupons apply to the watch subtotal; a 100% code also covers shipping and insurance.
       </p>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
@@ -325,7 +336,7 @@ function CheckoutContent() {
               </label>
             </fieldset>
             {complimentaryShipping ? (
-              <p className="text-xs text-[var(--muted)]">100% coupon includes free shipping.</p>
+              <p className="text-xs text-[var(--muted)]">100% coupon includes free shipping and insurance.</p>
             ) : shippingQuote ? (
               <p className="text-xs text-[var(--muted)]">{shippingQuote.label}</p>
             ) : (
@@ -380,6 +391,18 @@ function CheckoutContent() {
                   : shippingQuote
                     ? `$${shippingUsd.toLocaleString()}`
                     : "Enter ZIP"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[var(--muted)]">Insurance</span>
+              <span>
+                {complimentaryShipping || insuranceUsd > 0
+                  ? complimentaryShipping
+                    ? "Free"
+                    : `$${insuranceUsd.toLocaleString()}`
+                  : subtotal > 0
+                    ? "Not required"
+                    : "—"}
               </span>
             </div>
             <div className="flex justify-between border-t border-white/15 pt-2 text-base font-semibold">

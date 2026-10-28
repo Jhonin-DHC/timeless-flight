@@ -23,6 +23,8 @@ interface SessionPayload {
     discountUsd: number;
     shippingUsd?: number;
     shippingLabel?: string;
+    insuranceUsd?: number;
+    insuranceLabel?: string;
     totalUsd: number;
   } | null;
   error?: string;
@@ -96,6 +98,14 @@ function CheckoutSuccessContent() {
             <span className="text-[var(--muted)]">Shipping: </span>$
             {payload.order.shippingUsd.toLocaleString()}
             {payload.order.shippingLabel ? ` (${payload.order.shippingLabel})` : ""}
+          </p>
+        ) : null}
+        {payload.order?.insuranceUsd ? (
+          <p>
+            <span className="text-[var(--muted)]">
+              {payload.order.insuranceLabel || "Insurance"}:{" "}
+            </span>
+            ${payload.order.insuranceUsd.toLocaleString()}
           </p>
         ) : null}
         <p>

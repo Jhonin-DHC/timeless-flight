@@ -87,6 +87,8 @@ export async function POST(request: Request) {
             discountUsd: order.discountUsd,
             shippingUsd: order.shippingUsd,
             shippingLabel: order.shippingLabel,
+            insuranceUsd: order.insuranceUsd,
+            insuranceLabel: order.insuranceLabel,
             shippingAddress: order.shippingAddress,
             totalUsd: order.totalUsd,
             couponCode: order.couponCode

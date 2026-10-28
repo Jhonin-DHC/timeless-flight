@@ -36,6 +36,8 @@ const OrderSchema = new Schema(
     shippingMethod: { type: String, enum: ["ground", "overnight", ""], default: "" },
     shippingZone: { type: String, enum: ["local", "us", ""], default: "" },
     shippingLabel: { type: String, default: "" },
+    insuranceUsd: { type: Number, default: 0 },
+    insuranceLabel: { type: String, default: "" },
     shippingAddress: { type: ShippingAddressSchema, default: () => ({}) },
     totalUsd: { type: Number, required: true },
     currency: { type: String, default: "usd" },

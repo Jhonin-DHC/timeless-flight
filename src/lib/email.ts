@@ -131,6 +131,8 @@ export type OrderMailPayload = {
   discountUsd?: number;
   shippingUsd?: number;
   shippingLabel?: string;
+  insuranceUsd?: number;
+  insuranceLabel?: string;
   shippingAddress?: OrderMailAddress;
   totalUsd: number;
   couponCode?: string;
@@ -168,6 +170,9 @@ export async function sendOrderPaidEmail(order: OrderMailPayload) {
     `Subtotal: ${money(order.subtotalUsd)}`,
     order.discountUsd ? `Discount${order.couponCode ? ` (${order.couponCode})` : ""}: -${money(order.discountUsd)}` : "",
     `Shipping${order.shippingLabel ? ` (${order.shippingLabel})` : ""}: ${money(order.shippingUsd || 0)}`,
+    order.insuranceUsd
+      ? `${order.insuranceLabel || "Insurance"}: ${money(order.insuranceUsd)}`
+      : "",
     `Total: ${money(order.totalUsd)}`,
     "",
     address ? `Ship to:\n${address}` : "",
@@ -191,6 +196,7 @@ export async function sendOrderPaidEmail(order: OrderMailPayload) {
           Subtotal: ${money(order.subtotalUsd)}<br />
           ${order.discountUsd ? `Discount${order.couponCode ? ` (${order.couponCode})` : ""}: -${money(order.discountUsd)}<br />` : ""}
           Shipping${order.shippingLabel ? ` (${order.shippingLabel})` : ""}: ${money(order.shippingUsd || 0)}<br />
+          ${order.insuranceUsd ? `${order.insuranceLabel || "Insurance"}: ${money(order.insuranceUsd)}<br />` : ""}
           <strong>Total: ${money(order.totalUsd)}</strong>
         </p>
         ${address ? `<p><strong>Ship to</strong><br />${address.replace(/\n/g, "<br />")}</p>` : ""}

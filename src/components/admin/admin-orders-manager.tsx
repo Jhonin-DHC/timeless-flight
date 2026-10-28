@@ -20,6 +20,8 @@ interface OrderRow {
   discountUsd: number;
   shippingUsd: number;
   shippingLabel: string;
+  insuranceUsd?: number;
+  insuranceLabel?: string;
   shippingAddress?: {
     line1?: string;
     city?: string;
@@ -159,7 +161,12 @@ export function AdminOrdersManager() {
                       {Number(order.totalUsd || 0).toLocaleString()}
                     </p>
                   </div>
-                  <p className="text-xs text-[var(--muted)]">{order.shippingLabel || "Shipping"}</p>
+                  <p className="text-xs text-[var(--muted)]">
+                    {order.shippingLabel || "Shipping"}
+                    {order.insuranceUsd
+                      ? ` · ${order.insuranceLabel || "Insurance"} $${Number(order.insuranceUsd).toLocaleString()}`
+                      : ""}
+                  </p>
                 </div>
 
                 <ul className="space-y-1 text-sm text-[var(--muted)]">

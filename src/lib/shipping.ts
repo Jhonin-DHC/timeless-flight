@@ -68,6 +68,57 @@ export function isComplimentaryShipping(percentOff: number) {
   return percentOff >= 100;
 }
 
+export type InsuranceSettings = {
+  minUsd: number;
+  percent: number;
+  percentAboveUsd: number;
+  applyAboveUsd: number;
+};
+
+export const DEFAULT_INSURANCE_SETTINGS: InsuranceSettings = {
+  minUsd: 2,
+  percent: 1,
+  percentAboveUsd: 715,
+  applyAboveUsd: 100
+};
+
+export function normalizeInsuranceSettings(input?: Partial<InsuranceSettings> | null): InsuranceSettings {
+  return {
+    minUsd: normalizeShippingRate(input?.minUsd, DEFAULT_INSURANCE_SETTINGS.minUsd),
+    percent: normalizeShippingRate(input?.percent, DEFAULT_INSURANCE_SETTINGS.percent),
+    percentAboveUsd: normalizeShippingRate(input?.percentAboveUsd, DEFAULT_INSURANCE_SETTINGS.percentAboveUsd),
+    applyAboveUsd: normalizeShippingRate(input?.applyAboveUsd, DEFAULT_INSURANCE_SETTINGS.applyAboveUsd)
+  };
+}
+
+export function quoteInsurance(
+  declaredValueUsd: number,
+  percentOff = 0,
+  settings: Partial<InsuranceSettings> = DEFAULT_INSURANCE_SETTINGS
+) {
+  const live = normalizeInsuranceSettings(settings);
+  const value = Math.max(0, Number(declaredValueUsd) || 0);
+
+  if (isComplimentaryShipping(percentOff) || value <= live.applyAboveUsd) {
+    return {
+      amountUsd: 0,
+      label: "Shipping insurance",
+      applies: false
+    };
+  }
+
+  const amountUsd =
+    value > live.percentAboveUsd
+      ? Math.round(((value * live.percent) / 100) * 100) / 100
+      : live.minUsd;
+
+  return {
+    amountUsd,
+    label: "Shipping insurance",
+    applies: amountUsd > 0
+  };
+}
+
 export function quoteShipping(
   zip: string,
   method: ShippingMethod,
