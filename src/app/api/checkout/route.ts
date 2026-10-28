@@ -6,6 +6,7 @@ import {
   normalizeUsZip,
   quoteShipping
 } from "@/lib/shipping";
+import { getShippingRates } from "@/lib/shipping-settings";
 import { dollarsToCents, getSiteUrl, getStripe, isStripeConfigured } from "@/lib/stripe";
 import { AbandonedCart } from "@/models/AbandonedCart";
 import { Order } from "@/models/Order";
@@ -126,7 +127,8 @@ export async function POST(request: Request) {
       }
     }
 
-    const shipping = quoteShipping(shippingPostalCode, shippingMethod, percentOff);
+    const shippingRates = await getShippingRates();
+    const shipping = quoteShipping(shippingPostalCode, shippingMethod, percentOff, shippingRates);
     const merchandiseUsd = Math.max(0, Math.round((subtotalUsd - discountUsd) * 100) / 100);
     const totalUsd = Math.round((merchandiseUsd + shipping.amountUsd) * 100) / 100;
     // Stripe allows $0 when a 100% coupon applies; otherwise enforce the $0.50 floor.

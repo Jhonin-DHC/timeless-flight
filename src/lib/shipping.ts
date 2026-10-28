@@ -2,6 +2,32 @@ export const SHIPPING_LOCAL_USD = 45;
 export const SHIPPING_US_USD = 75;
 export const SHIPPING_OVERNIGHT_USD = 175;
 
+export type ShippingRates = {
+  localUsd: number;
+  usUsd: number;
+  overnightUsd: number;
+};
+
+export const DEFAULT_SHIPPING_RATES: ShippingRates = {
+  localUsd: SHIPPING_LOCAL_USD,
+  usUsd: SHIPPING_US_USD,
+  overnightUsd: SHIPPING_OVERNIGHT_USD
+};
+
+export function normalizeShippingRate(value: unknown, fallback: number) {
+  const amount = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(amount) || amount < 0) return fallback;
+  return Math.round(amount * 100) / 100;
+}
+
+export function normalizeShippingRates(input?: Partial<ShippingRates> | null): ShippingRates {
+  return {
+    localUsd: normalizeShippingRate(input?.localUsd, DEFAULT_SHIPPING_RATES.localUsd),
+    usUsd: normalizeShippingRate(input?.usUsd, DEFAULT_SHIPPING_RATES.usUsd),
+    overnightUsd: normalizeShippingRate(input?.overnightUsd, DEFAULT_SHIPPING_RATES.overnightUsd)
+  };
+}
+
 export const SHIPPING_METHODS = ["ground", "overnight"] as const;
 export type ShippingMethod = (typeof SHIPPING_METHODS)[number];
 
@@ -42,23 +68,29 @@ export function isComplimentaryShipping(percentOff: number) {
   return percentOff >= 100;
 }
 
-export function quoteShipping(zip: string, method: ShippingMethod, percentOff = 0) {
+export function quoteShipping(
+  zip: string,
+  method: ShippingMethod,
+  percentOff = 0,
+  rates: Partial<ShippingRates> = DEFAULT_SHIPPING_RATES
+) {
+  const live = normalizeShippingRates(rates);
   const local = isLocalPlanoShippingZip(zip);
   const quoted =
     method === "overnight"
       ? {
-          amountUsd: SHIPPING_OVERNIGHT_USD,
+          amountUsd: live.overnightUsd,
           zone: local ? ("local" as const) : ("us" as const),
           label: "Overnight insured shipping (US)"
         }
       : local
         ? {
-            amountUsd: SHIPPING_LOCAL_USD,
+            amountUsd: live.localUsd,
             zone: "local" as const,
             label: "Insured ground — Plano / DFW"
           }
         : {
-            amountUsd: SHIPPING_US_USD,
+            amountUsd: live.usUsd,
             zone: "us" as const,
             label: "Insured ground — rest of US"
           };

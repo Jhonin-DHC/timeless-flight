@@ -3,6 +3,8 @@ import { getEbayConfigStatus } from "@/lib/ebay";
 import { getTeamNotifyEmails, isEmailConfigured } from "@/lib/email";
 import { connectMongo } from "@/lib/mongodb";
 import { isR2Configured } from "@/lib/r2";
+import { normalizeShippingRate } from "@/lib/shipping";
+import { getShippingRates, saveShippingRates } from "@/lib/shipping-settings";
 import { getSetting, setSetting } from "@/models/AppSettings";
 
 export async function GET() {
@@ -10,11 +12,15 @@ export async function GET() {
     await connectMongo();
     const marketplaceId = await getSetting("marketplaceId", process.env.EBAY_MARKETPLACE_ID ?? "EBAY_US");
     const searchRunsPerDay = await getSetting("searchRunsPerDay", 3);
+    const shippingRates = await getShippingRates();
     const ebay = getEbayConfigStatus();
     return NextResponse.json({
       settings: {
         marketplaceId,
         searchRunsPerDay,
+        shippingLocalUsd: shippingRates.localUsd,
+        shippingUsUsd: shippingRates.usUsd,
+        shippingOvernightUsd: shippingRates.overnightUsd,
         ebayConfigured: ebay.configured,
         ebayEnv: ebay.env,
         mongoConfigured: Boolean(process.env.MONGODB_URI),
@@ -34,7 +40,19 @@ export async function PUT(request: Request) {
     await connectMongo();
     const body = await request.json();
     if (body.marketplaceId) await setSetting("marketplaceId", body.marketplaceId);
-    if (body.searchRunsPerDay) await setSetting("searchRunsPerDay", body.searchRunsPerDay);
+    if (typeof body.searchRunsPerDay === "number") await setSetting("searchRunsPerDay", body.searchRunsPerDay);
+    if (
+      body.shippingLocalUsd !== undefined ||
+      body.shippingUsUsd !== undefined ||
+      body.shippingOvernightUsd !== undefined
+    ) {
+      const current = await getShippingRates();
+      await saveShippingRates({
+        localUsd: normalizeShippingRate(body.shippingLocalUsd, current.localUsd),
+        usUsd: normalizeShippingRate(body.shippingUsUsd, current.usUsd),
+        overnightUsd: normalizeShippingRate(body.shippingOvernightUsd, current.overnightUsd)
+      });
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to save settings.";

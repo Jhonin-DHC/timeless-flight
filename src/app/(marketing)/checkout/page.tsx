@@ -4,13 +4,12 @@ import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCart } from "@/components/cart-provider";
 import {
+  DEFAULT_SHIPPING_RATES,
   isComplimentaryShipping,
   isUsZip,
   quoteShipping,
-  SHIPPING_LOCAL_USD,
-  SHIPPING_OVERNIGHT_USD,
-  SHIPPING_US_USD,
-  type ShippingMethod
+  type ShippingMethod,
+  type ShippingRates
 } from "@/lib/shipping";
 
 interface AppliedCoupon {
@@ -36,15 +35,16 @@ function CheckoutContent() {
   const [shippingMethod, setShippingMethod] = useState<ShippingMethod>("ground");
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [shippingRates, setShippingRates] = useState<ShippingRates>(DEFAULT_SHIPPING_RATES);
 
   const discount = appliedCoupon?.discountAmount ?? 0;
   const complimentaryShipping = isComplimentaryShipping(appliedCoupon?.percentOff ?? 0);
   const shippingQuote = useMemo(
     () =>
       isUsZip(shippingZip)
-        ? quoteShipping(shippingZip, shippingMethod, appliedCoupon?.percentOff ?? 0)
+        ? quoteShipping(shippingZip, shippingMethod, appliedCoupon?.percentOff ?? 0, shippingRates)
         : null,
-    [shippingZip, shippingMethod, appliedCoupon?.percentOff]
+    [shippingZip, shippingMethod, appliedCoupon?.percentOff, shippingRates]
   );
   const shippingUsd = complimentaryShipping ? 0 : (shippingQuote?.amountUsd ?? 0);
   const total = useMemo(
@@ -57,6 +57,17 @@ function CheckoutContent() {
       setInfoMessage("Checkout canceled. Your cart is still here when you’re ready to continue.");
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    void fetch("/api/checkout/shipping")
+      .then((response) => response.json())
+      .then((payload) => {
+        if (payload?.rates) setShippingRates(payload.rates);
+      })
+      .catch(() => {
+        // Fall back to default rates if the live quote cannot load.
+      });
+  }, []);
 
   // Soft-capture abandoned carts: save when email looks valid (no verification).
   useEffect(() => {
@@ -111,6 +122,12 @@ function CheckoutContent() {
       if (typeof result.message === "string" && result.message) {
         setInfoMessage(result.message);
       }
+      void fetch("/api/checkout/shipping")
+        .then((shippingResponse) => shippingResponse.json())
+        .then((payload) => {
+          if (payload?.rates) setShippingRates(payload.rates);
+        })
+        .catch(() => undefined);
     } catch (error) {
       setAppliedCoupon(null);
       setErrorMessage(error instanceof Error ? error.message : "Failed to validate coupon.");
@@ -293,7 +310,7 @@ function CheckoutContent() {
                   className="mt-1"
                 />
                 <span>
-                  Insured ground — ${SHIPPING_LOCAL_USD} Plano / DFW, ${SHIPPING_US_USD} rest of US
+                  {`Insured ground — $${shippingRates.localUsd.toLocaleString()} Plano / DFW, $${shippingRates.usUsd.toLocaleString()} rest of US`}
                 </span>
               </label>
               <label className="flex cursor-pointer items-start gap-2 text-sm">
@@ -304,7 +321,7 @@ function CheckoutContent() {
                   onChange={() => setShippingMethod("overnight")}
                   className="mt-1"
                 />
-                <span>Overnight insured — ${SHIPPING_OVERNIGHT_USD} anywhere in the US</span>
+                <span>Overnight insured — ${shippingRates.overnightUsd.toLocaleString()} anywhere in the US</span>
               </label>
             </fieldset>
             {complimentaryShipping ? (
