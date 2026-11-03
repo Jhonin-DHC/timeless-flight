@@ -71,7 +71,11 @@ export async function POST(request: Request) {
             customerEmail: paidEmail || undefined,
             customerName: session.metadata?.customerName || undefined,
             totalUsd:
-              typeof session.amount_total === "number" ? session.amount_total / 100 : undefined
+              typeof session.amount_total === "number" ? session.amount_total / 100 : undefined,
+            taxUsd:
+              typeof session.total_details?.amount_tax === "number"
+                ? session.total_details.amount_tax / 100
+                : undefined
           }
         },
         { new: true }
@@ -89,6 +93,7 @@ export async function POST(request: Request) {
             shippingLabel: order.shippingLabel,
             insuranceUsd: order.insuranceUsd,
             insuranceLabel: order.insuranceLabel,
+            taxUsd: order.taxUsd,
             shippingAddress: order.shippingAddress,
             totalUsd: order.totalUsd,
             couponCode: order.couponCode

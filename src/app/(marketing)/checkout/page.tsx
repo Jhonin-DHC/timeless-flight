@@ -7,6 +7,7 @@ import {
   DEFAULT_INSURANCE_SETTINGS,
   DEFAULT_SHIPPING_RATES,
   isComplimentaryShipping,
+  isPickupMethod,
   isUsZip,
   quoteInsurance,
   quoteShipping,
@@ -40,25 +41,28 @@ function CheckoutContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [shippingRates, setShippingRates] = useState<ShippingRates>(DEFAULT_SHIPPING_RATES);
   const [insuranceSettings, setInsuranceSettings] = useState<InsuranceSettings>(DEFAULT_INSURANCE_SETTINGS);
+  const [taxUsd, setTaxUsd] = useState(0);
+  const [taxQuoted, setTaxQuoted] = useState(false);
 
   const discount = appliedCoupon?.discountAmount ?? 0;
   const complimentaryShipping = isComplimentaryShipping(appliedCoupon?.percentOff ?? 0);
+  const pickup = isPickupMethod(shippingMethod);
   const shippingQuote = useMemo(
     () =>
-      isUsZip(shippingZip)
+      pickup || isUsZip(shippingZip)
         ? quoteShipping(shippingZip, shippingMethod, appliedCoupon?.percentOff ?? 0, shippingRates)
         : null,
-    [shippingZip, shippingMethod, appliedCoupon?.percentOff, shippingRates]
+    [pickup, shippingZip, shippingMethod, appliedCoupon?.percentOff, shippingRates]
   );
   const insuranceQuote = useMemo(
-    () => quoteInsurance(subtotal, appliedCoupon?.percentOff ?? 0, insuranceSettings),
-    [subtotal, appliedCoupon?.percentOff, insuranceSettings]
+    () => quoteInsurance(subtotal, appliedCoupon?.percentOff ?? 0, insuranceSettings, shippingMethod),
+    [subtotal, appliedCoupon?.percentOff, insuranceSettings, shippingMethod]
   );
-  const shippingUsd = complimentaryShipping ? 0 : (shippingQuote?.amountUsd ?? 0);
-  const insuranceUsd = complimentaryShipping ? 0 : insuranceQuote.amountUsd;
+  const shippingUsd = pickup || complimentaryShipping ? 0 : (shippingQuote?.amountUsd ?? 0);
+  const insuranceUsd = pickup || complimentaryShipping ? 0 : insuranceQuote.amountUsd;
   const total = useMemo(
-    () => Math.max(0, subtotal - discount) + shippingUsd + insuranceUsd,
-    [subtotal, discount, shippingUsd, insuranceUsd]
+    () => Math.max(0, subtotal - discount) + shippingUsd + insuranceUsd + taxUsd,
+    [subtotal, discount, shippingUsd, insuranceUsd, taxUsd]
   );
 
   useEffect(() => {
@@ -68,16 +72,40 @@ function CheckoutContent() {
   }, [searchParams]);
 
   useEffect(() => {
-    void fetch("/api/checkout/shipping")
-      .then((response) => response.json())
-      .then((payload) => {
-        if (payload?.rates) setShippingRates(payload.rates);
-        if (payload?.insuranceSettings) setInsuranceSettings(payload.insuranceSettings);
-      })
-      .catch(() => {
-        // Fall back to default rates if the live quote cannot load.
-      });
-  }, []);
+    if (pickup) {
+      setTaxUsd(0);
+      setTaxQuoted(false);
+    }
+  }, [pickup]);
+
+  useEffect(() => {
+    const params = new URLSearchParams({
+      method: shippingMethod,
+      percentOff: String(appliedCoupon?.percentOff ?? 0),
+      subtotal: String(subtotal),
+      discount: String(discount),
+      zip: shippingZip,
+      state: shippingState,
+      city: shippingCity,
+      line1: shippingLine1
+    });
+    const timer = window.setTimeout(() => {
+      void fetch(`/api/checkout/shipping?${params.toString()}`)
+        .then((response) => response.json())
+        .then((payload) => {
+          if (payload?.rates) setShippingRates(payload.rates);
+          if (payload?.insuranceSettings) setInsuranceSettings(payload.insuranceSettings);
+          if (payload?.tax) {
+            setTaxUsd(Number(payload.tax.amountUsd) || 0);
+            setTaxQuoted(Boolean(payload.tax.quoted));
+          }
+        })
+        .catch(() => {
+          // Fall back to default rates if the live quote cannot load.
+        });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [shippingMethod, appliedCoupon?.percentOff, subtotal, discount, shippingZip, shippingState, shippingCity, shippingLine1]);
 
   // Soft-capture abandoned carts: save when email looks valid (no verification).
   useEffect(() => {
@@ -132,13 +160,6 @@ function CheckoutContent() {
       if (typeof result.message === "string" && result.message) {
         setInfoMessage(result.message);
       }
-      void fetch("/api/checkout/shipping")
-        .then((shippingResponse) => shippingResponse.json())
-        .then((payload) => {
-          if (payload?.rates) setShippingRates(payload.rates);
-          if (payload?.insuranceSettings) setInsuranceSettings(payload.insuranceSettings);
-        })
-        .catch(() => undefined);
     } catch (error) {
       setAppliedCoupon(null);
       setErrorMessage(error instanceof Error ? error.message : "Failed to validate coupon.");
@@ -165,13 +186,15 @@ function CheckoutContent() {
       setErrorMessage("Name and email are required.");
       return;
     }
-    if (!shippingLine1.trim() || !shippingCity.trim() || !/^[A-Za-z]{2}$/.test(shippingState.trim())) {
-      setErrorMessage("Enter a US shipping address (street, city, and 2-letter state).");
-      return;
-    }
-    if (!isUsZip(shippingZip)) {
-      setErrorMessage("Enter a 5-digit US ZIP so we can quote shipping.");
-      return;
+    if (!pickup) {
+      if (!shippingLine1.trim() || !shippingCity.trim() || !/^[A-Za-z]{2}$/.test(shippingState.trim())) {
+        setErrorMessage("Enter a US shipping address (street, city, and 2-letter state).");
+        return;
+      }
+      if (!isUsZip(shippingZip)) {
+        setErrorMessage("Enter a 5-digit US ZIP so we can quote shipping.");
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -209,8 +232,9 @@ function CheckoutContent() {
     <section className="space-y-6">
       <h1 className="section-title">Checkout</h1>
       <p className="section-copy max-w-3xl">
-        Review your cart and continue to secure Stripe payment. We ship inside the US only from Plano, TX. Percent
-        coupons apply to the watch subtotal; a 100% code also covers shipping and insurance.
+        Review your cart and continue to secure Stripe payment. We ship inside the US from Plano, TX, or you can pick up
+        in Plano. Sales tax is charged on the watch only — never on shipping or insurance. Percent coupons apply to the
+        watch subtotal; a 100% code also covers shipping and insurance.
       </p>
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
@@ -277,41 +301,19 @@ function CheckoutContent() {
           />
 
           <div className="space-y-3 rounded-xl border border-white/15 p-3">
-            <h3 className="text-sm font-medium">US shipping address</h3>
-            <input
-              value={shippingLine1}
-              onChange={(event) => setShippingLine1(event.target.value)}
-              placeholder="Street address"
-              autoComplete="shipping address-line1"
-              className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm outline-none ring-[var(--brand-a)] focus:ring-2"
-            />
-            <div className="grid gap-2 sm:grid-cols-[1fr_5rem_6.5rem]">
-              <input
-                value={shippingCity}
-                onChange={(event) => setShippingCity(event.target.value)}
-                placeholder="City"
-                autoComplete="shipping address-level2"
-                className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm outline-none ring-[var(--brand-a)] focus:ring-2"
-              />
-              <input
-                value={shippingState}
-                onChange={(event) => setShippingState(event.target.value.toUpperCase().slice(0, 2))}
-                placeholder="TX"
-                autoComplete="shipping address-level1"
-                maxLength={2}
-                className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm uppercase outline-none ring-[var(--brand-a)] focus:ring-2"
-              />
-              <input
-                value={shippingZip}
-                onChange={(event) => setShippingZip(event.target.value.replace(/\D/g, "").slice(0, 5))}
-                placeholder="ZIP"
-                inputMode="numeric"
-                autoComplete="shipping postal-code"
-                className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm outline-none ring-[var(--brand-a)] focus:ring-2"
-              />
-            </div>
+            <h3 className="text-sm font-medium">Fulfillment</h3>
             <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">Shipping method</legend>
+              <legend className="text-sm font-medium">Method</legend>
+              <label className="flex cursor-pointer items-start gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="shippingMethod"
+                  checked={shippingMethod === "pickup"}
+                  onChange={() => setShippingMethod("pickup")}
+                  className="mt-1"
+                />
+                <span>Pickup in Plano, TX — no shipping or insurance</span>
+              </label>
               <label className="flex cursor-pointer items-start gap-2 text-sm">
                 <input
                   type="radio"
@@ -335,12 +337,53 @@ function CheckoutContent() {
                 <span>Overnight insured — ${shippingRates.overnightUsd.toLocaleString()} anywhere in the US</span>
               </label>
             </fieldset>
-            {complimentaryShipping ? (
-              <p className="text-xs text-[var(--muted)]">100% coupon includes free shipping and insurance.</p>
-            ) : shippingQuote ? (
-              <p className="text-xs text-[var(--muted)]">{shippingQuote.label}</p>
+            {pickup ? (
+              <p className="text-xs text-[var(--muted)]">
+                We will contact you when the watch is ready. Tax is still charged on the watch only.
+              </p>
             ) : (
-              <p className="text-xs text-[var(--muted)]">Enter a ZIP to see the exact shipping fee.</p>
+              <>
+                <h4 className="text-sm font-medium">US shipping address</h4>
+                <input
+                  value={shippingLine1}
+                  onChange={(event) => setShippingLine1(event.target.value)}
+                  placeholder="Street address"
+                  autoComplete="shipping address-line1"
+                  className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm outline-none ring-[var(--brand-a)] focus:ring-2"
+                />
+                <div className="grid gap-2 sm:grid-cols-[1fr_5rem_6.5rem]">
+                  <input
+                    value={shippingCity}
+                    onChange={(event) => setShippingCity(event.target.value)}
+                    placeholder="City"
+                    autoComplete="shipping address-level2"
+                    className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm outline-none ring-[var(--brand-a)] focus:ring-2"
+                  />
+                  <input
+                    value={shippingState}
+                    onChange={(event) => setShippingState(event.target.value.toUpperCase().slice(0, 2))}
+                    placeholder="TX"
+                    autoComplete="shipping address-level1"
+                    maxLength={2}
+                    className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm uppercase outline-none ring-[var(--brand-a)] focus:ring-2"
+                  />
+                  <input
+                    value={shippingZip}
+                    onChange={(event) => setShippingZip(event.target.value.replace(/\D/g, "").slice(0, 5))}
+                    placeholder="ZIP"
+                    inputMode="numeric"
+                    autoComplete="shipping postal-code"
+                    className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm outline-none ring-[var(--brand-a)] focus:ring-2"
+                  />
+                </div>
+                {complimentaryShipping ? (
+                  <p className="text-xs text-[var(--muted)]">100% coupon includes free shipping and insurance.</p>
+                ) : shippingQuote ? (
+                  <p className="text-xs text-[var(--muted)]">{shippingQuote.label}</p>
+                ) : (
+                  <p className="text-xs text-[var(--muted)]">Enter a ZIP to see the exact shipping fee.</p>
+                )}
+              </>
             )}
           </div>
 
@@ -386,7 +429,7 @@ function CheckoutContent() {
             <div className="flex justify-between">
               <span className="text-[var(--muted)]">Shipping</span>
               <span>
-                {complimentaryShipping
+                {pickup || complimentaryShipping
                   ? "Free"
                   : shippingQuote
                     ? `$${shippingUsd.toLocaleString()}`
@@ -396,13 +439,27 @@ function CheckoutContent() {
             <div className="flex justify-between">
               <span className="text-[var(--muted)]">Insurance</span>
               <span>
-                {complimentaryShipping || insuranceUsd > 0
-                  ? complimentaryShipping
-                    ? "Free"
-                    : `$${insuranceUsd.toLocaleString()}`
-                  : subtotal > 0
-                    ? "Not required"
-                    : "—"}
+                {pickup
+                  ? "Not required"
+                  : complimentaryShipping || insuranceUsd > 0
+                    ? complimentaryShipping
+                      ? "Free"
+                      : `$${insuranceUsd.toLocaleString()}`
+                    : subtotal > 0
+                      ? "Not required"
+                      : "—"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[var(--muted)]">Tax</span>
+              <span>
+                {taxQuoted || taxUsd > 0
+                  ? `$${taxUsd.toLocaleString()}`
+                  : pickup
+                    ? "At payment"
+                    : isUsZip(shippingZip) && /^[A-Za-z]{2}$/.test(shippingState)
+                      ? "At payment"
+                      : "Enter address"}
               </span>
             </div>
             <div className="flex justify-between border-t border-white/15 pt-2 text-base font-semibold">

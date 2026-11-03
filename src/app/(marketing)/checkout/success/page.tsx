@@ -25,6 +25,8 @@ interface SessionPayload {
     shippingLabel?: string;
     insuranceUsd?: number;
     insuranceLabel?: string;
+    taxUsd?: number;
+    shippingMethod?: string;
     totalUsd: number;
   } | null;
   error?: string;
@@ -84,7 +86,9 @@ function CheckoutSuccessContent() {
       <h1 className="section-title">{paid ? "Payment successful" : "Checkout received"}</h1>
       <p className="section-copy max-w-2xl">
         {paid
-          ? "Thank you for your purchase. A confirmation email is on the way, and we will send tracking when your watch ships."
+          ? payload.order?.shippingMethod === "pickup"
+            ? "Thank you for your purchase. A confirmation email is on the way. We will contact you when the watch is ready for pickup in Plano."
+            : "Thank you for your purchase. A confirmation email is on the way, and we will send tracking when your watch ships."
           : "Your checkout session was created. If payment is still processing, refresh in a moment."}
       </p>
 
@@ -93,7 +97,12 @@ function CheckoutSuccessContent() {
           <span className="text-[var(--muted)]">Email: </span>
           {payload.order?.customerEmail || payload.session?.customerEmail || "—"}
         </p>
-        {payload.order?.shippingUsd ? (
+        {payload.order?.shippingMethod === "pickup" ? (
+          <p>
+            <span className="text-[var(--muted)]">Fulfillment: </span>
+            {payload.order.shippingLabel || "Store pickup — Plano, TX"}
+          </p>
+        ) : payload.order?.shippingUsd ? (
           <p>
             <span className="text-[var(--muted)]">Shipping: </span>$
             {payload.order.shippingUsd.toLocaleString()}
@@ -106,6 +115,12 @@ function CheckoutSuccessContent() {
               {payload.order.insuranceLabel || "Insurance"}:{" "}
             </span>
             ${payload.order.insuranceUsd.toLocaleString()}
+          </p>
+        ) : null}
+        {payload.order?.taxUsd ? (
+          <p>
+            <span className="text-[var(--muted)]">Tax: </span>$
+            {payload.order.taxUsd.toLocaleString()}
           </p>
         ) : null}
         <p>

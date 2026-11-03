@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectMongo } from "@/lib/mongodb";
 import {
+  isPickupMethod,
   isShippingMethod,
   isUsZip,
   normalizeUsZip,
@@ -9,6 +10,12 @@ import {
 } from "@/lib/shipping";
 import { getInsuranceSettings, getShippingRates } from "@/lib/shipping-settings";
 import { dollarsToCents, getSiteUrl, getStripe, isStripeConfigured } from "@/lib/stripe";
+import {
+  isAutomaticTaxUnavailable,
+  NONTAXABLE_TAX_CODE,
+  quoteWatchTax,
+  WATCH_TAX_CODE
+} from "@/lib/tax";
 import { AbandonedCart } from "@/models/AbandonedCart";
 import { Order } from "@/models/Order";
 import type Stripe from "stripe";
@@ -38,6 +45,18 @@ async function resolvePromotionCode(stripe: Stripe, code: string) {
   if (!coupon || coupon.valid === false) return null;
 
   return { promo, coupon };
+}
+
+async function createCheckoutSession(stripe: Stripe, params: Stripe.Checkout.SessionCreateParams) {
+  try {
+    return await stripe.checkout.sessions.create({
+      ...params,
+      automatic_tax: { enabled: true }
+    });
+  } catch (error) {
+    if (!isAutomaticTaxUnavailable(error)) throw error;
+    return await stripe.checkout.sessions.create(params);
+  }
 }
 
 function estimateDiscountUsd(coupon: Stripe.Coupon, subtotalUsd: number) {
@@ -78,14 +97,18 @@ export async function POST(request: Request) {
     if (!customerEmail || !customerName) {
       return NextResponse.json({ error: "Name and email are required." }, { status: 400 });
     }
-    if (!shippingLine1 || !shippingCity || !/^[A-Z]{2}$/.test(shippingState) || !isUsZip(shippingPostalCode)) {
+    if (!shippingMethod) {
+      return NextResponse.json({ error: "Choose pickup, ground, or overnight." }, { status: 400 });
+    }
+    const pickup = isPickupMethod(shippingMethod);
+    if (
+      !pickup &&
+      (!shippingLine1 || !shippingCity || !/^[A-Z]{2}$/.test(shippingState) || !isUsZip(shippingPostalCode))
+    ) {
       return NextResponse.json(
         { error: "US shipping address is required (street, city, 2-letter state, 5-digit ZIP)." },
         { status: 400 }
       );
-    }
-    if (!shippingMethod) {
-      return NextResponse.json({ error: "Choose ground or overnight shipping." }, { status: 400 });
     }
     if (items.length === 0) {
       return NextResponse.json({ error: "Cart is empty." }, { status: 400 });
@@ -131,25 +154,67 @@ export async function POST(request: Request) {
     const shippingRates = await getShippingRates();
     const insuranceSettings = await getInsuranceSettings();
     const shipping = quoteShipping(shippingPostalCode, shippingMethod, percentOff, shippingRates);
-    const insurance = quoteInsurance(subtotalUsd, percentOff, insuranceSettings);
+    const insurance = quoteInsurance(subtotalUsd, percentOff, insuranceSettings, shippingMethod);
     const merchandiseUsd = Math.max(0, Math.round((subtotalUsd - discountUsd) * 100) / 100);
-    const totalUsd = Math.round((merchandiseUsd + shipping.amountUsd + insurance.amountUsd) * 100) / 100;
+    const tax = await quoteWatchTax(
+      merchandiseUsd,
+      pickup ? null : {
+        line1: shippingLine1,
+        city: shippingCity,
+        state: shippingState,
+        postalCode: shippingPostalCode
+      }
+    );
+    const totalUsd = Math.round(
+      (merchandiseUsd + shipping.amountUsd + insurance.amountUsd + tax.amountUsd) * 100
+    ) / 100;
     // Stripe allows $0 when a 100% coupon applies; otherwise enforce the $0.50 floor.
     if (totalUsd > 0 && totalUsd < 0.5) {
       return NextResponse.json({ error: "Order total must be at least $0.50 for Stripe Checkout." }, { status: 400 });
     }
 
+    const customer = await stripe.customers.create({
+      email: customerEmail,
+      name: customerName,
+      ...(pickup
+        ? {}
+        : {
+            address: {
+              line1: shippingLine1,
+              city: shippingCity,
+              state: shippingState,
+              postal_code: shippingPostalCode,
+              country: "US"
+            },
+            shipping: {
+              name: customerName,
+              address: {
+                line1: shippingLine1,
+                city: shippingCity,
+                state: shippingState,
+                postal_code: shippingPostalCode,
+                country: "US"
+              }
+            }
+          })
+    });
+
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: "payment",
-      customer_email: customerEmail,
+      customer: customer.id,
+      customer_update: pickup
+        ? { address: "auto", name: "auto" }
+        : { address: "auto", name: "auto", shipping: "auto" },
       client_reference_id: customerEmail,
       line_items: normalizedItems.map((item) => ({
         quantity: item.quantity,
         price_data: {
           currency: "usd",
           unit_amount: dollarsToCents(item.priceUsd),
+          tax_behavior: "exclusive",
           product_data: {
             name: item.name,
+            tax_code: WATCH_TAX_CODE,
             metadata: {
               productId: item.productId,
               listingId: item.listingId
@@ -159,28 +224,36 @@ export async function POST(request: Request) {
       })),
       success_url: `${siteUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/checkout?canceled=1`,
-      shipping_options: [
-        {
-          shipping_rate_data: {
-            type: "fixed_amount",
-            display_name: insurance.amountUsd > 0 ? `${shipping.label} + insurance` : shipping.label,
-            fixed_amount: {
-              amount: dollarsToCents(shipping.amountUsd + insurance.amountUsd),
-              currency: "usd"
-            },
-            delivery_estimate:
-              shippingMethod === "overnight"
-                ? {
-                    minimum: { unit: "business_day", value: 1 },
-                    maximum: { unit: "business_day", value: 1 }
-                  }
-                : {
-                    minimum: { unit: "business_day", value: 3 },
-                    maximum: { unit: "business_day", value: 7 }
-                  }
-          }
-        }
-      ],
+      ...(pickup
+        ? { billing_address_collection: "required" }
+        : {
+            shipping_address_collection: { allowed_countries: ["US"] },
+            shipping_options: [
+              {
+                shipping_rate_data: {
+                  type: "fixed_amount",
+                  display_name:
+                    insurance.amountUsd > 0 ? `${shipping.label} + insurance` : shipping.label,
+                  tax_behavior: "exclusive",
+                  tax_code: NONTAXABLE_TAX_CODE,
+                  fixed_amount: {
+                    amount: dollarsToCents(shipping.amountUsd + insurance.amountUsd),
+                    currency: "usd"
+                  },
+                  delivery_estimate:
+                    shippingMethod === "overnight"
+                      ? {
+                          minimum: { unit: "business_day", value: 1 },
+                          maximum: { unit: "business_day", value: 1 }
+                        }
+                      : {
+                          minimum: { unit: "business_day", value: 3 },
+                          maximum: { unit: "business_day", value: 7 }
+                        }
+                }
+              }
+            ]
+          }),
       metadata: {
         customerName,
         customerEmail,
@@ -190,10 +263,11 @@ export async function POST(request: Request) {
         percentOff: String(percentOff),
         shippingUsd: String(shipping.amountUsd),
         insuranceUsd: String(insurance.amountUsd),
+        taxUsd: String(tax.amountUsd),
         shippingMethod,
         shippingZone: shipping.zone,
         shippingZip: shippingPostalCode
-      },
+      }
     };
 
     // $0 Checkout Sessions do not create a PaymentIntent.
@@ -213,7 +287,7 @@ export async function POST(request: Request) {
       sessionParams.allow_promotion_codes = true;
     }
 
-    const session = await stripe.checkout.sessions.create(sessionParams);
+    const session = await createCheckoutSession(stripe, sessionParams);
     if (!session.url) {
       return NextResponse.json({ error: "Stripe did not return a checkout URL." }, { status: 502 });
     }
@@ -230,6 +304,7 @@ export async function POST(request: Request) {
       shippingUsd: shipping.amountUsd,
       insuranceUsd: insurance.amountUsd,
       insuranceLabel: insurance.label,
+      taxUsd: tax.amountUsd,
       shippingMethod,
       shippingZone: shipping.zone,
       shippingLabel: shipping.label,

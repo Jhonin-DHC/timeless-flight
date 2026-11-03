@@ -133,6 +133,7 @@ export type OrderMailPayload = {
   shippingLabel?: string;
   insuranceUsd?: number;
   insuranceLabel?: string;
+  taxUsd?: number;
   shippingAddress?: OrderMailAddress;
   totalUsd: number;
   couponCode?: string;
@@ -160,6 +161,7 @@ export async function sendOrderPaidEmail(order: OrderMailPayload) {
   if (!isEmailConfigured() || !order.customerEmail) return;
 
   const address = formatAddress(order.shippingAddress);
+  const pickup = /pickup/i.test(order.shippingLabel || "");
   const subject = `Order confirmed — ${SITE_NAME}`;
   const text = [
     `Thank you${order.customerName ? `, ${order.customerName}` : ""} for your purchase from ${SITE_NAME}.`,
@@ -173,11 +175,14 @@ export async function sendOrderPaidEmail(order: OrderMailPayload) {
     order.insuranceUsd
       ? `${order.insuranceLabel || "Insurance"}: ${money(order.insuranceUsd)}`
       : "",
+    order.taxUsd ? `Tax: ${money(order.taxUsd)}` : "",
     `Total: ${money(order.totalUsd)}`,
     "",
-    address ? `Ship to:\n${address}` : "",
+    address ? `Ship to:\n${address}` : pickup ? "Pickup in Plano, TX." : "",
     "",
-    "We will email tracking as soon as your watch ships.",
+    pickup
+      ? "We will contact you when your watch is ready for pickup."
+      : "We will email tracking as soon as your watch ships.",
     `Questions: ${SITE_PHONE_DISPLAY}`
   ]
     .filter((line, index, lines) => !(line === "" && lines[index - 1] === ""))
@@ -197,10 +202,11 @@ export async function sendOrderPaidEmail(order: OrderMailPayload) {
           ${order.discountUsd ? `Discount${order.couponCode ? ` (${order.couponCode})` : ""}: -${money(order.discountUsd)}<br />` : ""}
           Shipping${order.shippingLabel ? ` (${order.shippingLabel})` : ""}: ${money(order.shippingUsd || 0)}<br />
           ${order.insuranceUsd ? `${order.insuranceLabel || "Insurance"}: ${money(order.insuranceUsd)}<br />` : ""}
+          ${order.taxUsd ? `Tax: ${money(order.taxUsd)}<br />` : ""}
           <strong>Total: ${money(order.totalUsd)}</strong>
         </p>
-        ${address ? `<p><strong>Ship to</strong><br />${address.replace(/\n/g, "<br />")}</p>` : ""}
-        <p>We will email tracking as soon as your watch ships.</p>
+        ${address ? `<p><strong>Ship to</strong><br />${address.replace(/\n/g, "<br />")}</p>` : pickup ? "<p><strong>Pickup</strong> in Plano, TX.</p>" : ""}
+        <p>${pickup ? "We will contact you when your watch is ready for pickup." : "We will email tracking as soon as your watch ships."}</p>
         <p style="color:#666;">Questions: ${SITE_PHONE_DISPLAY}</p>
       </div>
     `

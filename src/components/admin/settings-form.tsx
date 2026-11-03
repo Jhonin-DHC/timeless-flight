@@ -80,8 +80,9 @@ export function SettingsForm() {
         <div className="space-y-3 border-t border-white/10 pt-4">
           <h3 className="text-sm font-medium">US shipping fees</h3>
           <p className="text-xs text-[var(--muted)]">
-            Checkout uses these amounts immediately. A 100% coupon still waives shipping and insurance; other percent
-            codes apply to the watch subtotal only.
+            Checkout uses these amounts immediately. Pickup has no shipping or insurance. Sales tax is charged on the
+            watch only. A 100% coupon still waives shipping and insurance; other percent codes apply to the watch
+            subtotal only.
           </p>
           <div className="grid gap-3 md:grid-cols-3">
             <label className="space-y-1 text-xs text-[var(--muted)]">

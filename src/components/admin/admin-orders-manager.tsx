@@ -22,6 +22,8 @@ interface OrderRow {
   shippingLabel: string;
   insuranceUsd?: number;
   insuranceLabel?: string;
+  taxUsd?: number;
+  shippingMethod?: string;
   shippingAddress?: {
     line1?: string;
     city?: string;
@@ -113,8 +115,8 @@ export function AdminOrdersManager() {
       <div>
         <h1 className="text-2xl font-semibold">Orders</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          {paidCount} paid · {awaitingShipCount} waiting for tracking. Saving a tracking number emails the buyer a UPS or
-          FedEx link.
+          {paidCount} paid · {awaitingShipCount} waiting for tracking. Pickup orders skip shipping and insurance. Saving
+          a tracking number emails the buyer a UPS or FedEx link.
         </p>
       </div>
 
@@ -162,10 +164,11 @@ export function AdminOrdersManager() {
                     </p>
                   </div>
                   <p className="text-xs text-[var(--muted)]">
-                    {order.shippingLabel || "Shipping"}
+                    {order.shippingLabel || (order.shippingMethod === "pickup" ? "Pickup" : "Shipping")}
                     {order.insuranceUsd
                       ? ` · ${order.insuranceLabel || "Insurance"} $${Number(order.insuranceUsd).toLocaleString()}`
                       : ""}
+                    {order.taxUsd ? ` · Tax $${Number(order.taxUsd).toLocaleString()}` : ""}
                   </p>
                 </div>
 
@@ -183,46 +186,50 @@ export function AdminOrdersManager() {
                   </p>
                 ) : null}
 
-                <div className="grid gap-2 sm:grid-cols-[8rem_1fr_auto]">
-                  <select
-                    value={draft.carrier}
-                    onChange={(event) =>
-                      setDrafts((current) => ({
-                        ...current,
-                        [order._id]: {
-                          ...draft,
-                          carrier: event.target.value as ShippingCarrier
-                        }
-                      }))
-                    }
-                    className="rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm"
-                  >
-                    {Object.entries(SHIPPING_CARRIER_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    value={draft.trackingNumber}
-                    onChange={(event) =>
-                      setDrafts((current) => ({
-                        ...current,
-                        [order._id]: { ...draft, trackingNumber: event.target.value }
-                      }))
-                    }
-                    placeholder="Tracking number"
-                    className="rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm"
-                  />
-                  <button
-                    type="button"
-                    disabled={busyId === order._id || order.status !== "paid"}
-                    onClick={() => void saveTracking(order._id)}
-                    className="btn-gradient-primary text-sm"
-                  >
-                    {busyId === order._id ? "Saving…" : "Save & email"}
-                  </button>
-                </div>
+                {order.shippingMethod === "pickup" ? (
+                  <p className="text-sm text-[var(--muted)]">Pickup in Plano — no tracking.</p>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-[8rem_1fr_auto]">
+                    <select
+                      value={draft.carrier}
+                      onChange={(event) =>
+                        setDrafts((current) => ({
+                          ...current,
+                          [order._id]: {
+                            ...draft,
+                            carrier: event.target.value as ShippingCarrier
+                          }
+                        }))
+                      }
+                      className="rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm"
+                    >
+                      {Object.entries(SHIPPING_CARRIER_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      value={draft.trackingNumber}
+                      onChange={(event) =>
+                        setDrafts((current) => ({
+                          ...current,
+                          [order._id]: { ...draft, trackingNumber: event.target.value }
+                        }))
+                      }
+                      placeholder="Tracking number"
+                      className="rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm"
+                    />
+                    <button
+                      type="button"
+                      disabled={busyId === order._id || order.status !== "paid"}
+                      onClick={() => void saveTracking(order._id)}
+                      className="btn-gradient-primary text-sm"
+                    >
+                      {busyId === order._id ? "Saving…" : "Save & email"}
+                    </button>
+                  </div>
+                )}
                 {trackHref ? (
                   <p className="text-xs text-[var(--muted)]">
                     <a href={trackHref} target="_blank" rel="noreferrer" className="text-[var(--brand-c)]">

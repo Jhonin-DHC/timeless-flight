@@ -54,6 +54,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
           shippingLabel: order.shippingLabel,
           insuranceUsd: order.insuranceUsd,
           insuranceLabel: order.insuranceLabel,
+          taxUsd: order.taxUsd,
           shippingAddress: order.shippingAddress,
           totalUsd: order.totalUsd,
           couponCode: order.couponCode,

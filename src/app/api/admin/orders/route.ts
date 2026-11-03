@@ -19,6 +19,7 @@ export async function GET(request: Request) {
     const paidCount = await Order.countDocuments({ status: "paid" });
     const awaitingShipCount = await Order.countDocuments({
       status: "paid",
+      shippingMethod: { $ne: "pickup" },
       $or: [{ trackingNumber: "" }, { trackingNumber: null }, { trackingNumber: { $exists: false } }]
     });
 

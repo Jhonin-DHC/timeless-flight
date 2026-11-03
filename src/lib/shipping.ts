@@ -28,7 +28,7 @@ export function normalizeShippingRates(input?: Partial<ShippingRates> | null): S
   };
 }
 
-export const SHIPPING_METHODS = ["ground", "overnight"] as const;
+export const SHIPPING_METHODS = ["ground", "overnight", "pickup"] as const;
 export type ShippingMethod = (typeof SHIPPING_METHODS)[number];
 
 export const SHIPPING_CARRIERS = ["ups", "fedex"] as const;
@@ -58,6 +58,10 @@ export function isLocalPlanoShippingZip(value: string) {
 
 export function isShippingMethod(value: string): value is ShippingMethod {
   return (SHIPPING_METHODS as readonly string[]).includes(value);
+}
+
+export function isPickupMethod(value: string) {
+  return value === "pickup";
 }
 
 export function isShippingCarrier(value: string): value is ShippingCarrier {
@@ -94,12 +98,17 @@ export function normalizeInsuranceSettings(input?: Partial<InsuranceSettings> | 
 export function quoteInsurance(
   declaredValueUsd: number,
   percentOff = 0,
-  settings: Partial<InsuranceSettings> = DEFAULT_INSURANCE_SETTINGS
+  settings: Partial<InsuranceSettings> = DEFAULT_INSURANCE_SETTINGS,
+  method?: ShippingMethod
 ) {
   const live = normalizeInsuranceSettings(settings);
   const value = Math.max(0, Number(declaredValueUsd) || 0);
 
-  if (isComplimentaryShipping(percentOff) || value <= live.applyAboveUsd) {
+  if (
+    isPickupMethod(method || "") ||
+    isComplimentaryShipping(percentOff) ||
+    value <= live.applyAboveUsd
+  ) {
     return {
       amountUsd: 0,
       label: "Shipping insurance",
@@ -125,6 +134,14 @@ export function quoteShipping(
   percentOff = 0,
   rates: Partial<ShippingRates> = DEFAULT_SHIPPING_RATES
 ) {
+  if (isPickupMethod(method)) {
+    return {
+      amountUsd: 0,
+      zone: "" as const,
+      label: "Store pickup — Plano, TX"
+    };
+  }
+
   const live = normalizeShippingRates(rates);
   const local = isLocalPlanoShippingZip(zip);
   const quoted =
