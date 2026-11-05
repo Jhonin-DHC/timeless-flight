@@ -12,6 +12,7 @@ interface SettingsPayload {
   insurancePercent: number;
   insurancePercentAboveUsd: number;
   insuranceApplyAboveUsd: number;
+  taxPercent: number;
   ebayConfigured: boolean;
   ebayEnv?: "sandbox" | "production";
   mongoConfigured: boolean;
@@ -44,7 +45,8 @@ export function SettingsForm() {
         insuranceMinUsd: settings.insuranceMinUsd,
         insurancePercent: settings.insurancePercent,
         insurancePercentAboveUsd: settings.insurancePercentAboveUsd,
-        insuranceApplyAboveUsd: settings.insuranceApplyAboveUsd
+        insuranceApplyAboveUsd: settings.insuranceApplyAboveUsd,
+        taxPercent: settings.taxPercent
       })
     });
     setMessage(response.ok ? "Settings saved." : "Failed to save settings.");
@@ -180,6 +182,24 @@ export function SettingsForm() {
               />
             </label>
           </div>
+        </div>
+        <div className="space-y-3 border-t border-white/10 pt-4">
+          <h3 className="text-sm font-medium">Sales tax</h3>
+          <p className="text-xs text-[var(--muted)]">
+            Charged on the discounted watch subtotal only. Shipping and insurance are never taxed. Default is 8.25%.
+          </p>
+          <label className="block max-w-xs space-y-1 text-xs text-[var(--muted)]">
+            Tax percent
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step="0.01"
+              value={settings.taxPercent}
+              onChange={(event) => setSettings({ ...settings, taxPercent: Number(event.target.value) })}
+              className="w-full rounded-xl border border-white/15 bg-transparent px-3 py-2 text-sm text-white"
+            />
+          </label>
         </div>
         <button type="button" onClick={save} className="btn-gradient-primary text-sm">
           Save settings

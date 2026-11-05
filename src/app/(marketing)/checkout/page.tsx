@@ -15,6 +15,7 @@ import {
   type ShippingMethod,
   type ShippingRates
 } from "@/lib/shipping";
+import { DEFAULT_TAX_PERCENT, quoteWatchTax } from "@/lib/tax";
 
 interface AppliedCoupon {
   code: string;
@@ -41,8 +42,7 @@ function CheckoutContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [shippingRates, setShippingRates] = useState<ShippingRates>(DEFAULT_SHIPPING_RATES);
   const [insuranceSettings, setInsuranceSettings] = useState<InsuranceSettings>(DEFAULT_INSURANCE_SETTINGS);
-  const [taxUsd, setTaxUsd] = useState(0);
-  const [taxQuoted, setTaxQuoted] = useState(false);
+  const [taxPercent, setTaxPercent] = useState(DEFAULT_TAX_PERCENT);
 
   const discount = appliedCoupon?.discountAmount ?? 0;
   const complimentaryShipping = isComplimentaryShipping(appliedCoupon?.percentOff ?? 0);
@@ -60,6 +60,10 @@ function CheckoutContent() {
   );
   const shippingUsd = pickup || complimentaryShipping ? 0 : (shippingQuote?.amountUsd ?? 0);
   const insuranceUsd = pickup || complimentaryShipping ? 0 : insuranceQuote.amountUsd;
+  const taxUsd = useMemo(
+    () => quoteWatchTax(Math.max(0, subtotal - discount), taxPercent).amountUsd,
+    [subtotal, discount, taxPercent]
+  );
   const total = useMemo(
     () => Math.max(0, subtotal - discount) + shippingUsd + insuranceUsd + taxUsd,
     [subtotal, discount, shippingUsd, insuranceUsd, taxUsd]
@@ -72,22 +76,12 @@ function CheckoutContent() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (pickup) {
-      setTaxUsd(0);
-      setTaxQuoted(false);
-    }
-  }, [pickup]);
-
-  useEffect(() => {
     const params = new URLSearchParams({
       method: shippingMethod,
       percentOff: String(appliedCoupon?.percentOff ?? 0),
       subtotal: String(subtotal),
       discount: String(discount),
-      zip: shippingZip,
-      state: shippingState,
-      city: shippingCity,
-      line1: shippingLine1
+      zip: shippingZip
     });
     const timer = window.setTimeout(() => {
       void fetch(`/api/checkout/shipping?${params.toString()}`)
@@ -95,9 +89,8 @@ function CheckoutContent() {
         .then((payload) => {
           if (payload?.rates) setShippingRates(payload.rates);
           if (payload?.insuranceSettings) setInsuranceSettings(payload.insuranceSettings);
-          if (payload?.tax) {
-            setTaxUsd(Number(payload.tax.amountUsd) || 0);
-            setTaxQuoted(Boolean(payload.tax.quoted));
+          if (typeof payload?.taxSettings?.percent === "number") {
+            setTaxPercent(payload.taxSettings.percent);
           }
         })
         .catch(() => {
@@ -105,7 +98,7 @@ function CheckoutContent() {
         });
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [shippingMethod, appliedCoupon?.percentOff, subtotal, discount, shippingZip, shippingState, shippingCity, shippingLine1]);
+  }, [shippingMethod, appliedCoupon?.percentOff, subtotal, discount, shippingZip]);
 
   // Soft-capture abandoned carts: save when email looks valid (no verification).
   useEffect(() => {
@@ -451,16 +444,8 @@ function CheckoutContent() {
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[var(--muted)]">Tax</span>
-              <span>
-                {taxQuoted || taxUsd > 0
-                  ? `$${taxUsd.toLocaleString()}`
-                  : pickup
-                    ? "At payment"
-                    : isUsZip(shippingZip) && /^[A-Za-z]{2}$/.test(shippingState)
-                      ? "At payment"
-                      : "Enter address"}
-              </span>
+              <span className="text-[var(--muted)]">Tax ({taxPercent}%)</span>
+              <span>${taxUsd.toLocaleString()}</span>
             </div>
             <div className="flex justify-between border-t border-white/15 pt-2 text-base font-semibold">
               <span>Total</span>

@@ -7,9 +7,12 @@ import { normalizeInsuranceSettings, normalizeShippingRate } from "@/lib/shippin
 import {
   getInsuranceSettings,
   getShippingRates,
+  getTaxSettings,
   saveInsuranceSettings,
-  saveShippingRates
+  saveShippingRates,
+  saveTaxSettings
 } from "@/lib/shipping-settings";
+import { normalizeTaxPercent } from "@/lib/tax";
 import { getSetting, setSetting } from "@/models/AppSettings";
 
 export async function GET() {
@@ -19,6 +22,7 @@ export async function GET() {
     const searchRunsPerDay = await getSetting("searchRunsPerDay", 3);
     const shippingRates = await getShippingRates();
     const insurance = await getInsuranceSettings();
+    const tax = await getTaxSettings();
     const ebay = getEbayConfigStatus();
     return NextResponse.json({
       settings: {
@@ -31,6 +35,7 @@ export async function GET() {
         insurancePercent: insurance.percent,
         insurancePercentAboveUsd: insurance.percentAboveUsd,
         insuranceApplyAboveUsd: insurance.applyAboveUsd,
+        taxPercent: tax.percent,
         ebayConfigured: ebay.configured,
         ebayEnv: ebay.env,
         mongoConfigured: Boolean(process.env.MONGODB_URI),
@@ -78,6 +83,9 @@ export async function PUT(request: Request) {
           applyAboveUsd: normalizeShippingRate(body.insuranceApplyAboveUsd, current.applyAboveUsd)
         })
       );
+    }
+    if (body.taxPercent !== undefined) {
+      await saveTaxSettings({ percent: normalizeTaxPercent(body.taxPercent) });
     }
     return NextResponse.json({ ok: true });
   } catch (error) {

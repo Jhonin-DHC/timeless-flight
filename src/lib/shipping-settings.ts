@@ -5,10 +5,12 @@ import {
   type InsuranceSettings,
   type ShippingRates
 } from "@/lib/shipping";
+import { normalizeTaxSettings, type TaxSettings } from "@/lib/tax";
 import { getSetting, setSetting } from "@/models/AppSettings";
 
 const SHIPPING_RATES_KEY = "shippingRates";
 const INSURANCE_SETTINGS_KEY = "insuranceSettings";
+const TAX_SETTINGS_KEY = "taxSettings";
 
 export async function getShippingRates(): Promise<ShippingRates> {
   await connectMongo();
@@ -37,5 +39,21 @@ export async function saveInsuranceSettings(input: Partial<InsuranceSettings>): 
     ...input
   });
   await setSetting(INSURANCE_SETTINGS_KEY, settings);
+  return settings;
+}
+
+export async function getTaxSettings(): Promise<TaxSettings> {
+  await connectMongo();
+  const stored = await getSetting<Partial<TaxSettings> | number | null>(TAX_SETTINGS_KEY, null);
+  if (typeof stored === "number") return normalizeTaxSettings({ percent: stored });
+  return normalizeTaxSettings(stored);
+}
+
+export async function saveTaxSettings(input: Partial<TaxSettings>): Promise<TaxSettings> {
+  const settings = normalizeTaxSettings({
+    ...(await getTaxSettings()),
+    ...input
+  });
+  await setSetting(TAX_SETTINGS_KEY, settings);
   return settings;
 }

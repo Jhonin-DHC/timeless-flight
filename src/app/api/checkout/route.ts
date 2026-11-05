@@ -8,14 +8,9 @@ import {
   quoteInsurance,
   quoteShipping
 } from "@/lib/shipping";
-import { getInsuranceSettings, getShippingRates } from "@/lib/shipping-settings";
+import { getInsuranceSettings, getShippingRates, getTaxSettings } from "@/lib/shipping-settings";
 import { dollarsToCents, getSiteUrl, getStripe, isStripeConfigured } from "@/lib/stripe";
-import {
-  isAutomaticTaxUnavailable,
-  NONTAXABLE_TAX_CODE,
-  quoteWatchTax,
-  WATCH_TAX_CODE
-} from "@/lib/tax";
+import { quoteWatchTax } from "@/lib/tax";
 import { AbandonedCart } from "@/models/AbandonedCart";
 import { Order } from "@/models/Order";
 import type Stripe from "stripe";
@@ -47,16 +42,12 @@ async function resolvePromotionCode(stripe: Stripe, code: string) {
   return { promo, coupon };
 }
 
-async function createCheckoutSession(stripe: Stripe, params: Stripe.Checkout.SessionCreateParams) {
-  try {
-    return await stripe.checkout.sessions.create({
-      ...params,
-      automatic_tax: { enabled: true }
-    });
-  } catch (error) {
-    if (!isAutomaticTaxUnavailable(error)) throw error;
-    return await stripe.checkout.sessions.create(params);
-  }
+function fulfillmentDisplayName(label: string, insuranceUsd: number, taxUsd: number) {
+  const extras = [
+    insuranceUsd > 0 ? "insurance" : "",
+    taxUsd > 0 ? "tax" : ""
+  ].filter(Boolean);
+  return extras.length ? `${label} + ${extras.join(" + ")}` : label;
 }
 
 function estimateDiscountUsd(coupon: Stripe.Coupon, subtotalUsd: number) {
@@ -153,18 +144,11 @@ export async function POST(request: Request) {
 
     const shippingRates = await getShippingRates();
     const insuranceSettings = await getInsuranceSettings();
+    const taxSettings = await getTaxSettings();
     const shipping = quoteShipping(shippingPostalCode, shippingMethod, percentOff, shippingRates);
     const insurance = quoteInsurance(subtotalUsd, percentOff, insuranceSettings, shippingMethod);
     const merchandiseUsd = Math.max(0, Math.round((subtotalUsd - discountUsd) * 100) / 100);
-    const tax = await quoteWatchTax(
-      merchandiseUsd,
-      pickup ? null : {
-        line1: shippingLine1,
-        city: shippingCity,
-        state: shippingState,
-        postalCode: shippingPostalCode
-      }
-    );
+    const tax = quoteWatchTax(merchandiseUsd, taxSettings.percent);
     const totalUsd = Math.round(
       (merchandiseUsd + shipping.amountUsd + insurance.amountUsd + tax.amountUsd) * 100
     ) / 100;
@@ -211,10 +195,8 @@ export async function POST(request: Request) {
         price_data: {
           currency: "usd",
           unit_amount: dollarsToCents(item.priceUsd),
-          tax_behavior: "exclusive",
           product_data: {
             name: item.name,
-            tax_code: WATCH_TAX_CODE,
             metadata: {
               productId: item.productId,
               listingId: item.listingId
@@ -224,22 +206,19 @@ export async function POST(request: Request) {
       })),
       success_url: `${siteUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/checkout?canceled=1`,
-      ...(pickup
-        ? { billing_address_collection: "required" }
-        : {
-            shipping_address_collection: { allowed_countries: ["US"] },
-            shipping_options: [
-              {
-                shipping_rate_data: {
-                  type: "fixed_amount",
-                  display_name:
-                    insurance.amountUsd > 0 ? `${shipping.label} + insurance` : shipping.label,
-                  tax_behavior: "exclusive",
-                  tax_code: NONTAXABLE_TAX_CODE,
-                  fixed_amount: {
-                    amount: dollarsToCents(shipping.amountUsd + insurance.amountUsd),
-                    currency: "usd"
-                  },
+      ...(pickup ? { billing_address_collection: "required" } : { shipping_address_collection: { allowed_countries: ["US"] } }),
+      shipping_options: [
+        {
+          shipping_rate_data: {
+            type: "fixed_amount",
+            display_name: fulfillmentDisplayName(shipping.label, insurance.amountUsd, tax.amountUsd),
+            fixed_amount: {
+              amount: dollarsToCents(shipping.amountUsd + insurance.amountUsd + tax.amountUsd),
+              currency: "usd"
+            },
+            ...(pickup
+              ? {}
+              : {
                   delivery_estimate:
                     shippingMethod === "overnight"
                       ? {
@@ -250,10 +229,10 @@ export async function POST(request: Request) {
                           minimum: { unit: "business_day", value: 3 },
                           maximum: { unit: "business_day", value: 7 }
                         }
-                }
-              }
-            ]
-          }),
+                })
+          }
+        }
+      ],
       metadata: {
         customerName,
         customerEmail,
@@ -287,7 +266,7 @@ export async function POST(request: Request) {
       sessionParams.allow_promotion_codes = true;
     }
 
-    const session = await createCheckoutSession(stripe, sessionParams);
+    const session = await stripe.checkout.sessions.create(sessionParams);
     if (!session.url) {
       return NextResponse.json({ error: "Stripe did not return a checkout URL." }, { status: 502 });
     }
